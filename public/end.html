@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>ZPEED — Session terminée</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .end-hero {
+      text-align: center; padding: 40px 0 24px;
+    }
+    .end-icon { font-size: 4rem; margin-bottom: 12px; }
+    .end-title {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 2.4rem; font-weight: 900; font-style: italic;
+      color: var(--purple); letter-spacing: 2px; margin-bottom: 6px;
+    }
+    .end-sub { color: var(--text2); font-size: 0.95rem; }
+
+    .stat-row {
+      display: flex; justify-content: space-around;
+      background: var(--bg2); border-radius: 14px;
+      padding: 20px; margin-bottom: 16px;
+    }
+    .stat-block { text-align: center; }
+    .stat-value {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 2.2rem; font-weight: 900; color: var(--purple-light);
+    }
+    .stat-label { font-size: 0.75rem; color: var(--text2); margin-top: 2px; }
+
+    .cta-block {
+      background: linear-gradient(135deg, rgba(0,212,200,0.10), rgba(30,215,96,0.06));
+      border: 1px solid rgba(0,212,200,0.22);
+      border-radius: 16px; padding: 20px; text-align: center; margin-bottom: 16px;
+      display: flex; flex-direction: column; align-items: center; gap: 10px;
+    }
+    .cta-block .cta-title { font-size: 1rem; font-weight: 700; margin-bottom: 6px; }
+    .cta-block .cta-sub { font-size: 0.85rem; color: var(--text2); margin-bottom: 14px; }
+  </style>
+  <script src="bg.js"></script>
+  <script src="notif.js"></script>
+  <script src="logo-anim.js"></script>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <span class="logo"><img src="logo.png" alt="ZPEED" class="logo-img"></span>
+  </div>
+
+  <div class="end-hero">
+    <div class="end-icon">🎉</div>
+    <div class="end-title">Session terminée !</div>
+    <div class="end-sub" id="endSub">Merci à tous les participants</div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stat-row">
+    <div class="stat-block">
+      <div class="stat-value" id="statSongsCount">0</div>
+      <div class="stat-label">Sons joués</div>
+    </div>
+    <div class="stat-block">
+      <div class="stat-value" id="statGuestsCount">—</div>
+      <div class="stat-label">Guests</div>
+    </div>
+    <div class="stat-block">
+      <div class="stat-value" id="statCode">—</div>
+      <div class="stat-label">Code session</div>
+    </div>
+  </div>
+
+  <!-- CTA nouvelle session -->
+  <div class="cta-block">
+    <div class="cta-title">🎵 Organise la prochaine soirée</div>
+    <div class="cta-sub">La prochaine fois, tu es HOST automatiquement dès que tu connectes l'enceinte en premier.</div>
+    <button class="btn btn-primary" onclick="newSession()">
+      ▶ Nouvelle session
+    </button>
+    <button class="btn btn-secondary" onclick="shareResult()">
+      📤 Partager le bilan
+    </button>
+  </div>
+
+  <button class="btn btn-secondary" onclick="window.location.href='index.html'">
+    ← Retour à l'accueil
+  </button>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+  const code       = localStorage.getItem('zpeed_ended_code') || localStorage.getItem('zpeed_code') || '—';
+  const songsCount = localStorage.getItem('zpeed_ended_queue_count') || '0';
+
+  document.getElementById('statCode').textContent       = code;
+  document.getElementById('statSongsCount').textContent = songsCount;
+  document.getElementById('endSub').textContent         = `Session ${code} · Merci à tous !`;
+
+  function newSession() {
+    localStorage.removeItem('zpeed_code');
+    localStorage.removeItem('zpeed_hostId');
+    localStorage.removeItem('zpeed_qr');
+    localStorage.removeItem('zpeed_speakerName');
+    window.location.href = 'index.html';
+  }
+
+  function shareResult() {
+    const txt = `🎵 On a eu une session ZPEED incroyable ! ${songsCount} sons joués. Rejoins la prochaine !`;
+    if (navigator.share) {
+      navigator.share({ title: 'ZPEED Session', text: txt });
+    } else {
+      navigator.clipboard.writeText(txt).then(() => showToast('📋 Bilan copié !'));
+    }
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+</script>
+</body>
+</html>

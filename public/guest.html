@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>ZPEED — Guest</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="bg.js"></script>
+  <script src="notif.js"></script>
+  <script src="logo-anim.js"></script>
+  <style>
+
+
+    /* ── HEAT METER ── */
+    .heat-bar {
+      height: 3px; border-radius: 99px;
+      background: rgba(255,255,255,0.06);
+      margin-top: 7px; overflow: hidden;
+    }
+    .heat-fill {
+      height: 100%; border-radius: 99px;
+      transition: width 0.6s cubic-bezier(.34,1.56,.64,1), background 0.6s ease;
+    }
+
+    /* ── VOTER AVATARS ── */
+    .voter-avatars {
+      display: flex; gap: 4px; flex-wrap: wrap;
+      margin-top: 6px; align-items: center;
+    }
+    .voter-av {
+      width: 26px; height: 26px; border-radius: 50%;
+      flex-shrink: 0; display: block;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.35), 0 0 0 1.5px rgba(255,255,255,0.12);
+      animation: popIn 0.35s cubic-bezier(.34,1.56,.64,1);
+    }
+    .voter-av-more {
+      width: 26px; height: 26px; border-radius: 50%;
+      flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      font-size: 0.58rem; font-weight: 700; color: var(--text2);
+      background: rgba(0,212,200,0.15);
+      box-shadow: 0 0 0 1.5px rgba(0,212,200,0.25);
+    }
+
+    /* ── REACTIONS ── */
+    .reaction-strip {
+      display: flex; gap: 6px; margin-top: 10px;
+      padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05);
+    }
+    .btn-react {
+      flex: 1; padding: 6px 4px; border-radius: 10px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      font-size: 1.1rem; cursor: pointer;
+      transition: transform 0.15s, background 0.15s;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 2px;
+    }
+    .btn-react:active { transform: scale(0.88); }
+    .btn-react .react-label {
+      font-size: 0.55rem; color: var(--text2);
+      font-family: 'Inter', sans-serif; font-weight: 600;
+    }
+
+    /* ── EMOJI RAIN ── */
+    #emojiRain {
+      position: fixed; inset: 0;
+      pointer-events: none; z-index: 8000;
+      overflow: hidden;
+    }
+    .emoji-float {
+      position: absolute; bottom: -60px;
+      font-size: 1.8rem;
+      animation: floatUp 2.2s ease-out forwards;
+      user-select: none;
+    }
+
+    /* ── VOTE BURST ── */
+    .vote-burst {
+      position: absolute; pointer-events: none;
+      font-size: 1.5rem; font-weight: 900;
+      animation: burstUp 0.7s ease-out forwards;
+      z-index: 100;
+    }
+
+    /* ── SYNCED MOMENT ── */
+    #syncedMoment {
+      position: fixed; inset: 0; z-index: 9000;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: rgba(8,8,15,0.92);
+      backdrop-filter: blur(16px);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    #syncedMoment.show { opacity: 1; }
+    .moment-emoji { font-size: 4rem; animation: popIn 0.4s cubic-bezier(.34,1.56,.64,1); }
+    .moment-text {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.4rem; font-weight: 800;
+      color: var(--text); margin-top: 14px;
+      letter-spacing: -0.5px; text-align: center;
+    }
+    .moment-sub { font-size: 0.85rem; color: var(--text2); margin-top: 6px; }
+
+    /* ── VOTED TOAST (différent du toast normal) ── */
+    .voted-toast {
+      position: fixed; top: calc(70px + env(safe-area-inset-top, 0px)); left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      background: rgba(0,212,200,0.18);
+      border: 1px solid rgba(0,212,200,0.35);
+      backdrop-filter: blur(12px);
+      border-radius: 99px; padding: 7px 18px;
+      font-size: 0.82rem; font-weight: 600;
+      color: var(--text); white-space: nowrap;
+      opacity: 0; transition: all 0.3s ease;
+      z-index: 7000; pointer-events: none;
+    }
+    .voted-toast.show {
+      opacity: 1; transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── KEYFRAMES ── */
+    @keyframes floatUp {
+      0%   { transform: translateY(0) scale(0.5) rotate(-10deg); opacity: 1; }
+      60%  { opacity: 1; }
+      100% { transform: translateY(-80vh) scale(1.2) rotate(15deg); opacity: 0; }
+    }
+    @keyframes popIn {
+      0%   { transform: scale(0); opacity: 0; }
+      70%  { transform: scale(1.2); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    @keyframes burstUp {
+      0%   { transform: translateY(0) scale(1); opacity: 1; }
+      100% { transform: translateY(-50px) scale(1.6); opacity: 0; }
+    }
+    @keyframes heatPulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.6; }
+    }
+  </style>
+</head>
+<body>
+<div class="container with-mini">
+
+  <!-- BETA BANNER -->
+  <div style="background:rgba(255,165,0,0.06);border:1px solid rgba(255,165,0,0.14);border-radius:99px;padding:5px 14px;text-align:center;font-size:0.62rem;color:#FFA500;font-weight:600;margin-bottom:4px;letter-spacing:0.3px;align-self:center">
+    🧪 Bêta · Propose tes sons via YouTube
+  </div>
+
+  <!-- HEADER -->
+  <div class="header">
+    <a href="index.html" class="logo"><img src="logo.png" alt="ZPEED" class="logo-img"></a>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span class="badge purple">🎤 GUEST</span>
+      <span class="badge active" style="font-size:0.7rem" id="sessionBadge">
+        <span class="dot pulse"></span> <span id="codeDisplay"></span>
+      </span>
+    </div>
+  </div>
+
+  <!-- ═══ TAB BAR ═══ -->
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-propose" onclick="switchTab('propose')">
+      <span class="tab-icon"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="11" cy="11" r="7.5" fill="none" stroke="currentColor" stroke-width="2.5"/><line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg></span>
+      <span class="tab-label">Proposer</span>
+    </button>
+    <button class="tab-btn" id="tab-vote" onclick="switchTab('vote')">
+      <span class="tab-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3L15.5 9H20.5L16.5 13L18 19.5L12 16L6 19.5L7.5 13L3.5 9H8.5L12 3Z"/></svg></span>
+      <span class="tab-label">Voter</span>
+      <span class="tab-badge" id="badge-vote"></span>
+    </button>
+    <button class="tab-btn" id="tab-queue" onclick="switchTab('queue')">
+      <span class="tab-icon"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="4" width="18" height="2.5" rx="1.25"/><rect x="3" y="10.75" width="18" height="2.5" rx="1.25"/><rect x="3" y="17.5" width="12" height="2.5" rx="1.25"/></svg></span>
+      <span class="tab-label">Queue</span>
+      <span class="tab-badge" id="badge-queue"></span>
+    </button>
+    <button class="tab-btn" id="tab-profil" onclick="switchTab('profil')">
+      <span class="tab-icon"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="7.5" r="4"/><path d="M3 21c0-4.5 4-7.5 9-7.5s9 3 9 7.5H3z"/></svg></span>
+      <span class="tab-label">Profil</span>
+    </button>
+  </div>
+
+  <!-- ═══ PANEL : PROPOSER ═══ -->
+  <div class="tab-panel active" id="panel-propose">
+
+    <!-- Paywall si non abonné -->
+    <div class="paywall-banner" id="paywallBanner" style="display:none">
+      <div class="pw-title">🎵 Propose tes sons</div>
+      <div class="pw-sub">Abonne-toi pour ajouter des morceaux à la queue</div>
+      <div class="price-btns">
+        <button class="price-btn" onclick="subscribe('day')">
+          <span class="price">0,99 €</span>
+          Ce soir seulement
+        </button>
+        <button class="price-btn" onclick="subscribe('month')">
+          <span class="price">2,99 €</span>
+          / mois
+        </button>
+      </div>
+    </div>
+
+    <div id="searchSection">
+      <div class="section-title">🔍 Chercher un titre</div>
+      <div class="input-group">
+        <input class="input" id="searchInput" placeholder="Artiste, titre, vibe..."
+          onkeydown="if(event.key==='Enter') search()">
+        <button class="btn btn-primary btn-small" onclick="search()" style="white-space:nowrap">Chercher</button>
+      </div>
+      <div id="searchResults" style="margin-bottom:16px"></div>
+    </div>
+
+    <!-- Mes propositions -->
+    <div id="myProposals" style="display:none">
+      <div class="section-title">⭐ Mes propositions</div>
+      <div id="myProposalsList"></div>
+    </div>
+  </div>
+
+  <!-- ═══ PANEL : VOTER ═══ -->
+  <div class="tab-panel" id="panel-vote">
+    <div class="section-title">🗳 Voter pour les sons</div>
+    <div id="voteList">
+      <div class="empty">
+        <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3L15.5 9H20.5L16.5 13L18 19.5L12 16L6 19.5L7.5 13L3.5 9H8.5L12 3Z"/></svg></div>
+        <div class="empty-text">Aucune proposition à voter pour l'instant</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PANEL : QUEUE ═══ -->
+  <div class="tab-panel" id="panel-queue">
+    <!-- Now playing -->
+    <div class="now-playing" id="nowPlayingCard" style="display:none">
+      <!-- Top row: art + info + badge -->
+      <div class="np-inner">
+        <img class="np-thumb" id="npThumb" src=""
+          onerror="this.onerror=null;this.src=THUMB_FALLBACK">
+        <div class="np-text">
+          <div class="np-title"   id="npTitle">—</div>
+          <div class="np-channel" id="npChannel">—</div>
+          <div class="np-meta">Proposé par <span id="npBy" style="color:var(--purple-light)">—</span></div>
+        </div>
+        <!-- Green checkmark = track en cours -->
+        <div class="np-badge">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M2.5 7L5.5 10L11.5 4" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
+      <!-- Bottom row: controls + CTA -->
+      <div class="np-footer">
+        <div class="np-controls">
+          <!-- Skip back -->
+          <button class="np-ctrl-btn" onclick="/* prev */">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/>
+            </svg>
+          </button>
+          <!-- Play/pause -->
+          <button class="np-ctrl-btn" onclick="/* play */">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+          </button>
+          <!-- Skip forward -->
+          <button class="np-ctrl-btn" onclick="/* next */">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/>
+            </svg>
+          </button>
+          <!-- Music note -->
+          <button class="np-ctrl-btn" onclick="switchTab('queue')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+            </svg>
+          </button>
+        </div>
+        <!-- CTA pill -->
+        <button class="np-btn-cta" onclick="switchTab('vote')">+ Voter</button>
+      </div>
+    </div>
+
+    <div class="section-title" style="display:flex;align-items:center;gap:7px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.6;flex-shrink:0"><rect x="3" y="4" width="18" height="2.5" rx="1.25"/><rect x="3" y="10.75" width="18" height="2.5" rx="1.25"/><rect x="3" y="17.5" width="12" height="2.5" rx="1.25"/></svg> File d'attente <span id="queueCount" style="color:var(--purple-light)"></span></div>
+    <div id="queueList">
+      <div class="empty">
+        <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
+        <div class="empty-text">Aucun titre. Sois le premier !</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PANEL : PROFIL ═══ -->
+  <div class="tab-panel" id="panel-profil">
+    <!-- Guest card -->
+    <div class="glass" style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+      <div id="profilAvatar" style="
+        width:72px;height:72px;flex-shrink:0;
+        box-shadow:0 4px 18px rgba(0,0,0,0.40);
+        border-radius:50%;
+      "><img id="profilAvatarImg" src="" alt="" style="width:100%;height:100%;display:block;border-radius:50%;"></div>
+      <div style="flex:1;position:relative;z-index:1">
+        <div style="font-size:1.1rem;font-weight:700" id="profilName"></div>
+        <div style="font-size:0.8rem;color:var(--text2)">Guest · Session <span id="profilCode" style="color:var(--purple-light)"></span></div>
+      </div>
+      <span class="badge active"><span class="dot pulse"></span> Live</span>
+    </div>
+
+    <!-- Abonnement -->
+    <div class="glass" style="margin-bottom:16px">
+      <div class="section-title" style="margin-bottom:10px">💳 Mon abonnement</div>
+      <div id="subscriptionStatus">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
+          <span>Statut</span>
+          <span id="subStatusLabel" style="color:var(--text2)">Gratuit (lecture seule)</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0">
+          <span>Proposer des sons</span>
+          <span id="subProposeLabel" style="color:var(--red)">✗ Non inclus</span>
+        </div>
+      </div>
+      <div class="price-btns" style="margin-top:12px">
+        <button class="price-btn" onclick="subscribe('day')">
+          <span class="price">0,99 €</span>
+          Ce soir
+        </button>
+        <button class="price-btn" onclick="subscribe('month')">
+          <span class="price">2,99 €</span>
+          / mois
+        </button>
+      </div>
+    </div>
+
+    <!-- Stats session -->
+    <div class="glass" style="margin-bottom:16px">
+      <div class="section-title" style="margin-bottom:6px">📊 Cette session</div>
+      <div class="profil-stat">
+        <span>Sons proposés</span>
+        <span id="statProposed" style="font-weight:700;color:var(--purple-light)">0</span>
+      </div>
+      <div class="profil-stat">
+        <span>Votes donnés</span>
+        <span id="statVoted" style="font-weight:700;color:var(--purple-light)">0</span>
+      </div>
+      <div class="profil-stat">
+        <span>Session</span>
+        <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--purple-light);letter-spacing:2px" id="statCode"></span>
+      </div>
+      <div class="profil-stat">
+        <span>Hôte</span>
+        <span id="statHost" style="font-weight:600"></span>
+      </div>
+    </div>
+
+    <button class="btn btn-secondary" onclick="leaveSession()">
+      ← Quitter la session
+    </button>
+  </div>
+
+</div><!-- /container -->
+
+<!-- ═══ STICKY MINI PLAYER ═══ -->
+<div class="mini-player" id="miniPlayer">
+  <div class="mini-player-inner">
+    <img class="mini-thumb" id="miniThumb" src=""
+      onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22%3E%3Crect width=%2224%22 height=%2224%22 fill=%22%231a1a24%22/%3E%3Cpath d=%22M9 17V6l10-2V15%22 stroke=%22%2300d4c8%22 stroke-width=%221.6%22 stroke-linecap=%22round%22 fill=%22none%22/%3E%3Ccircle cx=%227%22 cy=%2217%22 r=%222.2%22 fill=%22%2300d4c8%22/%3E%3Ccircle cx=%2217%22 cy=%2215%22 r=%222.2%22 fill=%22%2300d4c8%22/%3E%3C/svg%3E'">
+    <div class="mini-info">
+      <div class="mini-title" id="miniTitle">En attente de lecture...</div>
+      <div class="mini-sub"   id="miniSub">—</div>
+    </div>
+    <div class="mini-controls">
+      <button class="btn btn-small" onclick="switchTab('queue')" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.06);padding:0;min-height:unset;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.8)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="2.5" rx="1.25"/><rect x="3" y="10.75" width="18" height="2.5" rx="1.25"/><rect x="3" y="17.5" width="12" height="2.5" rx="1.25"/></svg>
+      </button>
+      <button class="btn btn-small" onclick="switchTab('vote')" style="width:36px;height:36px;border-radius:50%;background:var(--purple);border:none;padding:0;min-height:unset;display:flex;align-items:center;justify-content:center;color:#061014">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="emojiRain"></div>
+<div class="voted-toast" id="votedToast"></div>
+<div id="syncedMoment">
+  <div class="moment-emoji">🎵</div>
+  <div class="moment-text" id="momentText">Vous avez décidé ensemble</div>
+  <div class="moment-sub" id="momentSub">Le son commence...</div>
+</div>
+
+<script>
+  const urlCode    = new URLSearchParams(window.location.search).get('code');
+  const storedCode = localStorage.getItem('zpeed_code');
+  const code       = urlCode || storedCode;
+  const guestId    = localStorage.getItem('zpeed_guestId');
+  const guestName  = localStorage.getItem('zpeed_guestName') || 'Guest';
+  const hostName   = localStorage.getItem('zpeed_hostName') || 'Host';
+
+  if (!code || !guestId) window.location.href = 'index.html?code=' + (code || '');
+
+  // Fill UI
+  document.getElementById('codeDisplay').textContent   = code;
+  document.getElementById('profilName').textContent    = guestName;
+  document.getElementById('profilCode').textContent    = code;
+  // Apple-style avatar (canvas, no external dependency)
+  document.getElementById('profilAvatarImg').src = avatarUrl(guestName, 128);
+  document.getElementById('statCode').textContent      = code;
+  document.getElementById('statHost').textContent      = hostName;
+
+  const socket = io();
+  function joinRoom() { socket.emit('guest:join', { code, guestId, guestName }); }
+  socket.on('connect', joinRoom);
+
+  let queue         = [];
+  let votedTracks   = new Set();
+
+  // Flat music-note placeholder for broken thumbnails
+  const THUMB_FALLBACK = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" fill="#1a1a24"/><path d="M9 17V6l10-2V15" stroke="#00d4c8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="7" cy="17" r="2.2" fill="#00d4c8"/><circle cx="17" cy="15" r="2.2" fill="#00d4c8"/></svg>');
+  let proposedTracks= new Set();
+  let isSubscribed  = true; // Bêta test : accès libre pour tous
+  let statProposed  = 0;
+  let statVoted     = 0;
+
+  // ─────────────────────────────────────────────
+  // TABS
+  // ─────────────────────────────────────────────
+  function switchTab(name) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById(`tab-${name}`).classList.add('active');
+    document.getElementById(`panel-${name}`).classList.add('active');
+  }
+
+  // ─────────────────────────────────────────────
+  // SUBSCRIBE (POC — simulation)
+  // ─────────────────────────────────────────────
+  function subscribe(plan) {
+    // POC: simule l'abonnement sans vrai paiement
+    isSubscribed = true;
+    document.getElementById('paywallBanner').style.display  = 'none';
+    document.getElementById('subStatusLabel').textContent   = plan === 'day' ? 'Day Pass · Ce soir' : 'Monthly · 2,99 €/mois';
+    document.getElementById('subStatusLabel').style.color   = 'var(--green)';
+    document.getElementById('subProposeLabel').textContent  = '✓ Inclus';
+    document.getElementById('subProposeLabel').style.color  = 'var(--green)';
+    showToast(plan === 'day' ? '🎉 Day Pass activé ! Propose tes sons.' : '🎉 Abonnement mensuel activé !');
+  }
+
+  // ─────────────────────────────────────────────
+  // SEARCH
+  // ─────────────────────────────────────────────
+  async function search() {
+    const q = document.getElementById('searchInput').value.trim();
+    if (!q) return;
+    document.getElementById('searchResults').innerHTML =
+      `<div style="text-align:center;color:var(--text2);padding:16px">🔍 Recherche...</div>`;
+
+    try {
+      // Always search YouTube
+      const [ytRes, spRes] = await Promise.allSettled([
+        fetch(`/api/search?q=${encodeURIComponent(q)}`).then(r => r.json()),
+        fetch(`/api/spotify/search?q=${encodeURIComponent(q)}&code=${code}`).then(r => r.json()).catch(() => [])
+      ]);
+
+      const ytTracks = (ytRes.status === 'fulfilled' ? ytRes.value : []).map(t => ({ ...t, platform: 'youtube' }));
+      const spTracks = (spRes.status === 'fulfilled' && Array.isArray(spRes.value)) ? spRes.value : [];
+      const results  = [...spTracks, ...ytTracks];
+
+      if (!results.length) {
+        document.getElementById('searchResults').innerHTML =
+          `<div class="empty"><div class="empty-text">Aucun résultat pour "${q}"</div></div>`;
+        return;
+      }
+
+      document.getElementById('searchResults').innerHTML = results.map(t => `
+        <div class="search-result" onclick='propose(${JSON.stringify(t).replace(/'/g,"&#39;")})'>
+          <img class="search-thumb" src="${t.thumbnail||''}" onerror="this.style.display='none'">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:0.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.title}</div>
+            <div style="font-size:0.72rem;color:var(--text2);margin-top:2px">${t.channel} · ${t.duration||''}</div>
+          </div>
+          <span style="font-size:0.65rem;background:${t.platform==='spotify'?'rgba(30,215,96,0.15)':'rgba(255,0,0,0.12)'};color:${t.platform==='spotify'?'#1ED760':'#FF4444'};padding:3px 7px;border-radius:99px;font-weight:600;white-space:nowrap;flex-shrink:0">${t.platform==='spotify'?'Spotify':'YT'}</span>
+        </div>
+      `).join('');
+    } catch(e) {
+      document.getElementById('searchResults').innerHTML =
+        `<div class="empty"><div class="empty-text">Erreur de recherche</div></div>`;
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // PROPOSE
+  // ─────────────────────────────────────────────
+  function propose(track) {
+    if (!isSubscribed) { showToast('💳 Abonne-toi pour proposer !'); return; }
+    if (proposedTracks.has(track.videoId)) { showToast('⚠️ Déjà proposé !'); return; }
+    proposedTracks.add(track.videoId);
+    socket.emit('track:propose', { code, guestId, guestName, track });
+    document.getElementById('searchResults').innerHTML = '';
+    document.getElementById('searchInput').value = '';
+    statProposed++;
+    document.getElementById('statProposed').textContent = statProposed;
+    showToast(`🎵 "${track.title}" ajouté !`);
+    renderMyProposals();
+    switchTab('queue');
+  }
+
+  function renderMyProposals() {
+    const mine = queue.filter(t => t.proposedBy === guestName);
+    const el   = document.getElementById('myProposals');
+    const list = document.getElementById('myProposalsList');
+    if (!mine.length) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    list.innerHTML = mine.map(t => `
+      <div class="queue-item">
+        <img class="queue-thumb" src="${t.thumbnail||''}"
+          onerror="this.onerror=null;this.src=THUMB_FALLBACK">
+        <div class="queue-info">
+          <div class="queue-title">${t.title}</div>
+          <div class="queue-meta">${t.channel}</div>
+        </div>
+        <div class="vote-count">👍 ${t.votes}</div>
+      </div>
+    `).join('');
+  }
+
+  // ─────────────────────────────────────────────
+  // VOTE
+  // ─────────────────────────────────────────────
+  function vote(trackId, value, btn) {
+    if (votedTracks.has(trackId)) { showToast('⚠️ Déjà voté !'); return; }
+    votedTracks.add(trackId);
+    socket.emit('track:vote', { code, trackId, guestId, guestName, vote: value });
+    statVoted++;
+    document.getElementById('statVoted').textContent = statVoted;
+    // Haptic feedback
+    if (navigator.vibrate) navigator.vibrate(value > 0 ? [30] : [15, 10, 15]);
+    // Burst animation sur le bouton
+    if (btn) spawnBurst(btn, value > 0 ? '+1 🔥' : '-1');
+    // Réaction auto fire si upvote
+    if (value > 0) setTimeout(() => react(trackId, '🔥', true), 200);
+  }
+
+  function react(trackId, emoji, silent = false) {
+    socket.emit('track:react', { code, trackId, guestId, guestName, emoji });
+    if (!silent) spawnLocalEmoji(emoji, 3);
+  }
+
+  // ── Burst "+1" au-dessus du bouton ──
+  function spawnBurst(btn, text) {
+    const rect = btn.getBoundingClientRect();
+    const el = document.createElement('div');
+    el.className = 'vote-burst';
+    el.textContent = text;
+    el.style.left  = rect.left + rect.width / 2 - 20 + 'px';
+    el.style.top   = rect.top - 10 + 'px';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 700);
+  }
+
+  // ── Emoji rain local ──
+  function spawnLocalEmoji(emoji, count = 5) {
+    for (let i = 0; i < count; i++) {
+      setTimeout(() => {
+        const el = document.createElement('div');
+        el.className = 'emoji-float';
+        el.textContent = emoji;
+        el.style.left  = 10 + Math.random() * 80 + 'vw';
+        el.style.animationDelay = Math.random() * 0.3 + 's';
+        document.getElementById('emojiRain').appendChild(el);
+        setTimeout(() => el.remove(), 2500);
+      }, i * 80);
+    }
+  }
+
+  // ── Shower d'emojis massivement (quand tout le monde réagit) ──
+  function spawnEmojiShower(emoji, count = 12) {
+    for (let i = 0; i < count; i++) {
+      setTimeout(() => {
+        const el = document.createElement('div');
+        el.className = 'emoji-float';
+        el.textContent = emoji;
+        el.style.left  = Math.random() * 95 + 'vw';
+        el.style.fontSize = 1.2 + Math.random() * 1.4 + 'rem';
+        el.style.animationDuration = 1.5 + Math.random() * 1.2 + 's';
+        document.getElementById('emojiRain').appendChild(el);
+        setTimeout(() => el.remove(), 3000);
+      }, i * 60);
+    }
+  }
+
+  // ── Voted toast: "Marc a voté 🔥" ──
+  function showVotedToast(voterName, emoji) {
+    const t = document.getElementById('votedToast');
+    t.textContent = `${voterName} a voté ${emoji}`;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  // ── Synced moment: chanson choisie collectivement ──
+  function showSyncedMoment(track) {
+    if (navigator.vibrate) navigator.vibrate([40, 20, 40, 20, 80]);
+    const el = document.getElementById('syncedMoment');
+    document.getElementById('momentText').textContent = `"${track.title}"`;
+    document.getElementById('momentSub').textContent  = `Proposé par ${track.proposedBy} · On est chauds 🔥`;
+    el.querySelector('.moment-emoji').textContent      = '🎵';
+    el.classList.add('show');
+    spawnEmojiShower('🔥', 10);
+    setTimeout(() => el.classList.remove('show'), 2800);
+  }
+
+  function getHeatColor(votes, maxVotes) {
+    if (maxVotes === 0) return { color: 'rgba(0,212,200,0.3)', pct: 5 };
+    const pct = Math.min(100, Math.max(5, (votes / Math.max(maxVotes, 1)) * 100));
+    if (pct < 30)  return { color: '#00d4c8', pct };
+    if (pct < 60)  return { color: '#C97B2E', pct };
+    if (pct < 85)  return { color: '#E85D2A', pct };
+    return { color: '#FF3B1F', pct, pulse: true };
+  }
+
+  function renderVoteList() {
+    const el = document.getElementById('voteList');
+    const votable = queue.filter(t => t.proposedBy !== guestName);
+    const b = document.getElementById('badge-vote');
+    const unvoted = votable.filter(t => !votedTracks.has(t.id)).length;
+    if (unvoted > 0) { b.textContent = unvoted; b.classList.add('show'); }
+    else b.classList.remove('show');
+
+    if (!votable.length) {
+      el.innerHTML = `<div class="empty"><div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3L15.5 9H20.5L16.5 13L18 19.5L12 16L6 19.5L7.5 13L3.5 9H8.5L12 3Z"/></svg></div><div class="empty-text">Aucune proposition à voter</div></div>`;
+      return;
+    }
+
+    const maxVotes = Math.max(...votable.map(t => t.votes), 1);
+
+    el.innerHTML = votable.map(t => {
+      const voted   = votedTracks.has(t.id);
+      const score   = t.votes;
+      const heat    = getHeatColor(score, maxVotes);
+      const voters  = t.voterNames || [];
+      const avatars = voters.slice(0, 5).map(n =>
+        `<img class="voter-av" src="${avatarUrl(n, 40)}" alt="${n}" title="${n}" onerror="this.onerror=null;this.style.background='${stringToColor(n)}';">`
+      ).join('');
+      const moreVoters = voters.length > 5 ? `<div class="voter-av-more">+${voters.length - 5}</div>` : '';
+
+      return `
+        <div class="vote-card" id="vcard-${t.id}">
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <img src="${t.thumbnail||''}"
+              onerror="this.onerror=null;this.src=THUMB_FALLBACK"
+              style="width:52px;height:52px;border-radius:10px;object-fit:cover;flex-shrink:0">
+            <div style="flex:1;min-width:0">
+              <div class="vote-card-title">${t.title}</div>
+              <div class="vote-card-meta">${t.channel} · par ${t.proposedBy}</div>
+              ${voters.length ? `<div class="voter-avatars">${avatars}${moreVoters}</div>` : ''}
+              <div class="heat-bar">
+                <div class="heat-fill" style="width:${heat.pct}%;background:${heat.color};${heat.pulse?'animation:heatPulse 1s infinite':''}"></div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px">
+            <span class="vote-score ${score>0?'pos':score<0?'neg':''}" style="font-size:1rem;font-weight:800">${score>0?'+'+score:score} ${score>=5?'🔥':score>=3?'⚡':''}</span>
+            <div style="display:flex;gap:8px;position:relative">
+              <button class="btn-vote ${voted?'voted':''}" id="btnup-${t.id}"
+                onclick="vote('${t.id}',1,this)" ${voted?'disabled':''}>👍</button>
+              <button class="btn-vote" id="btndown-${t.id}"
+                onclick="vote('${t.id}',-1,this)" ${voted?'disabled':''}>👎</button>
+            </div>
+          </div>
+          <div class="reaction-strip">
+            <button class="btn-react" onclick="react('${t.id}','🔥')">🔥<span class="react-label">Fire</span></button>
+            <button class="btn-react" onclick="react('${t.id}','💜')">💜<span class="react-label">Vibe</span></button>
+            <button class="btn-react" onclick="react('${t.id}','🎵')">🎵<span class="react-label">Banger</span></button>
+            <button class="btn-react" onclick="react('${t.id}','😴')">😴<span class="react-label">Skip</span></button>
+            <button class="btn-react" onclick="react('${t.id}','🙏')">🙏<span class="react-label">Please</span></button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // ─────────────────────────────────────────────
+  // SOCKET EVENTS
+  // ─────────────────────────────────────────────
+  socket.on('queue:update', ({ queue: q }) => {
+    queue = q;
+    renderQueue(); renderVoteList(); renderMyProposals();
+    const b = document.getElementById('badge-queue');
+    if (q.length > 0) { b.textContent = q.length; b.classList.add('show'); }
+    else b.classList.remove('show');
+  });
+
+  socket.on('track:playing', ({ track }) => {
+    renderNowPlaying(track); updateMiniPlayer(track);
+    if (track) showSyncedMoment(track);
+  });
+
+  socket.on('track:voted', ({ trackId, voterName, initials, votes }) => {
+    // Ne pas afficher si c'est nous-mêmes
+    if (voterName === guestName) return;
+    showVotedToast(voterName, '🔥');
+    // Faire pop l'avatar sur la card si elle est visible
+    const card = document.getElementById(`vcard-${trackId}`);
+    if (card) {
+      const avContainer = card.querySelector('.voter-avatars');
+      if (avContainer) {
+        const bg  = stringToColor(voterName);
+        const av  = document.createElement('div');
+        av.className   = 'voter-av';
+        av.style.background = bg;
+        av.textContent = initials;
+        avContainer.appendChild(av);
+      }
+    }
+  });
+
+  socket.on('track:reaction', ({ trackId, guestName: reactorName, emoji }) => {
+    // Afficher la pluie d'emojis — intensité selon qui réagit
+    const count = reactorName === guestName ? 3 : 6;
+    spawnLocalEmoji(emoji, count);
+    // Si beaucoup réagissent au même emoji → shower
+    if (reactorName !== guestName) showVotedToast(reactorName, emoji);
+  });
+
+  socket.on('notification', ({ message }) => showToast(message));
+
+  // 🎤 AI DJ — commentaire quand un titre démarre
+  socket.on('ai:dj_comment', ({ comment, track }) => {
+    showNotif({
+      icon: '🎤',
+      title: comment,
+      sub: track ? `${track.title} · ${track.artist}` : '',
+      type: 'ai',
+      duration: 5500
+    });
+  });
+
+  // 🔥 Roast — uniquement si c'est pour ce guest
+  socket.on('ai:roast', ({ roast, guestId: targetId }) => {
+    if (!targetId || targetId === guestId) {
+      showNotif({ icon: '🔥', title: roast, type: 'warn', duration: 6500 });
+    }
+  });
+
+  socket.on('session:ended', () => {
+    showToast('⏹ La session a été terminée par le host');
+    setTimeout(() => window.location.href = 'index.html', 2500);
+  });
+
+  // ─────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────
+  function renderNowPlaying(track) {
+    const card = document.getElementById('nowPlayingCard');
+    if (!track) { card.style.display = 'none'; return; }
+    card.style.display = 'block';
+    document.getElementById('npThumb').src           = track.thumbnail;
+    document.getElementById('npTitle').textContent   = track.title;
+    document.getElementById('npChannel').textContent = track.channel + ' · proposé par ' + track.proposedBy;
+  }
+
+  function updateMiniPlayer(track) {
+    const mp = document.getElementById('miniPlayer');
+    if (!track) { mp.classList.remove('visible'); return; }
+    mp.classList.add('visible');
+    document.getElementById('miniThumb').src         = track.thumbnail || '';
+    document.getElementById('miniTitle').textContent = track.title;
+    document.getElementById('miniSub').textContent   = track.channel;
+  }
+
+  function renderQueue() {
+    const el    = document.getElementById('queueList');
+    const count = document.getElementById('queueCount');
+    count.textContent = queue.length ? `(${queue.length})` : '';
+    if (!queue.length) {
+      el.innerHTML = `<div class="empty"><div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div><div class="empty-text">Aucun titre. Sois le premier !</div></div>`;
+      return;
+    }
+    el.innerHTML = queue.map((t, i) => {
+      const isOwn = t.proposedBy === guestName;
+      return `
+        <div class="queue-item ${isOwn ? 'playing' : ''}">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:1.1rem;font-weight:700;color:var(--text2);min-width:20px;text-align:center">${i+1}</div>
+          <img class="queue-thumb" src="${t.thumbnail}"
+            onerror="this.onerror=null;this.src=THUMB_FALLBACK">
+          <div class="queue-info">
+            <div class="queue-title">${t.title}</div>
+            <div class="queue-meta">${t.channel}</div>
+            <div class="queue-proposer">${isOwn ? '⭐ Toi' : '🎤 ' + t.proposedBy}</div>
+          </div>
+          <div class="vote-count" style="font-size:1rem">${t.votes > 0 ? '+'+t.votes : t.votes}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function stringToColor(str) {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) h = str.charCodeAt(i) + ((h<<5) - h);
+    return `hsl(${h % 360},55%,35%)`;
+  }
+
+  // ── Apple-style avatar via DiceBear lorelei ──────────────────
+  // Apple Contacts–style avatar: gradient + initials, canvas-generated data URL
+  function avatarUrl(name, size) {
+    const GRADS = [
+      ['#FF6B6B','#EE0979'],['#FF9A44','#FC6076'],['#43E97B','#38F9D7'],
+      ['#4FACFE','#00F2FE'],['#A18CD1','#FBC2EB'],['#F093FB','#F5576C'],
+      ['#4481EB','#04BEFE'],['#FA709A','#FEE140'],['#0BA360','#3CBA92'],
+      ['#FF5F6D','#FFC371'],['#30CFD0','#330867'],['#667EEA','#764BA2']
+    ];
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h<<5) - h);
+    const [c1, c2] = GRADS[Math.abs(h) % GRADS.length];
+    const s = size || 80;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = s * dpr;
+    const ctx = cv.getContext('2d');
+    ctx.scale(dpr, dpr);
+    // Circular clip for transparent corners
+    ctx.beginPath();
+    ctx.arc(s/2, s/2, s/2, 0, Math.PI*2);
+    ctx.clip();
+    // Gradient background (Apple palette)
+    const grd = ctx.createLinearGradient(0, 0, s, s);
+    grd.addColorStop(0, c1);
+    grd.addColorStop(1, c2);
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, s, s);
+    // Inner highlight (iOS depth effect)
+    const hl = ctx.createRadialGradient(s*0.35, s*0.28, 0, s/2, s/2, s/2);
+    hl.addColorStop(0, 'rgba(255,255,255,0.28)');
+    hl.addColorStop(1, 'rgba(0,0,0,0.10)');
+    ctx.fillStyle = hl;
+    ctx.fillRect(0, 0, s, s);
+    // Initials
+    const initials = name.trim().split(/\s+/).slice(0,2).map(w => w[0].toUpperCase()).join('');
+    ctx.shadowColor = 'rgba(0,0,0,0.22)';
+    ctx.shadowBlur = s * 0.06;
+    ctx.fillStyle = 'rgba(255,255,255,0.96)';
+    ctx.font = `600 ${Math.round(s*0.38)}px -apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(initials, s/2, s/2 + s*0.025);
+    return cv.toDataURL('image/png');
+  }
+
+  // ─────────────────────────────────────────────
+  // ACTIONS
+  // ─────────────────────────────────────────────
+  function leaveSession() {
+    if (confirm('Quitter la session ?')) {
+      localStorage.removeItem('zpeed_code');
+      localStorage.removeItem('zpeed_guestId');
+      localStorage.removeItem('zpeed_guestName');
+      window.location.href = 'index.html';
+    }
+  }
+
+  // showToast / showNotif → provided by notif.js
+
+  // ─────────────────────────────────────────────
+  // INIT
+  // ─────────────────────────────────────────────
+  fetch(`/api/session/${code}`)
+    .then(r => r.json())
+    .then(data => {
+      queue = data.queue || [];
+      renderQueue(); renderVoteList();
+      if (data.currentTrack) { renderNowPlaying(data.currentTrack); updateMiniPlayer(data.currentTrack); }
+    });
+</script>
+</body>
+</html>

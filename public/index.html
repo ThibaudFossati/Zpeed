@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>ZPEED — La musique, ensemble</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .step { display: none; }
+    .step.active { display: flex; flex-direction: column; gap: 18px; align-items: stretch; }
+
+    /* Toast sur index = pas de mini-player en bas */
+    #toast { bottom: 40px !important; }
+
+    .hero-sub {
+      text-align: center; font-size: 0.95rem; color: var(--text2); font-weight: 400;
+    }
+
+    .role-card {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 12px; padding: 28px 20px;
+      border-radius: var(--radius-card);
+      border: 1px solid var(--border2);
+      background: var(--bg2);
+      cursor: pointer;
+      transition: background 0.15s, transform 0.12s;
+      text-align: center;
+    }
+    .role-card:hover { background: var(--bg3); }
+    .role-card:active { transform: scale(0.98); }
+    .role-card .role-icon { font-size: 2.4rem; line-height: 1; }
+    .role-card .role-name {
+      font-family: 'Inter', sans-serif;
+      font-size: 1.2rem; font-weight: 700;
+      color: var(--text);
+    }
+    .role-card .role-desc { font-size: 0.8rem; color: var(--text2); line-height: 1.5; font-weight: 400; }
+    .role-card.host-card {
+      border-color: rgba(16,185,129,0.20);
+      background: rgba(16,185,129,0.06);
+    }
+    .role-card.host-card:hover {
+      background: rgba(16,185,129,0.12);
+    }
+
+    /* ── 4-box code entry ── */
+    .code-boxes {
+      display: flex; gap: 10px; margin-top: 16px;
+      justify-content: center;
+    }
+    .code-box {
+      width: 56px; height: 60px;
+      background: var(--bg);
+      border: 1.5px solid var(--border2);
+      border-radius: 14px;
+      font-family: 'Inter', sans-serif;
+      font-size: 1.4rem; font-weight: 700;
+      text-align: center; color: var(--purple-light);
+      text-transform: uppercase; caret-color: var(--purple-light);
+      transition: border-color 0.2s;
+      outline: none; -webkit-appearance: none;
+    }
+    .code-box:focus {
+      border-color: var(--purple);
+    }
+    .code-box.filled {
+      border-color: rgba(0,212,200,0.35);
+      background: rgba(0,212,200,0.06);
+    }
+    .guest-card { cursor: default !important; }
+    .guest-card:hover, .guest-card:active {
+      background: rgba(0,212,200,0.06) !important;
+      transform: none !important;
+    }
+
+    .beta-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(255,165,0,0.08); border: 1px solid rgba(255,165,0,0.18);
+      border-radius: 99px; padding: 6px 16px;
+      font-size: 0.72rem; color: #FFA500; font-weight: 600;
+      margin: 0 auto; width: fit-content; letter-spacing: 0.3px;
+    }
+
+    .confirm-role {
+      display: inline-block; padding: 5px 14px; border-radius: 99px;
+      font-family: 'Inter', sans-serif;
+      font-weight: 600; font-size: 0.78rem; letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .confirm-role.host {
+      background: rgba(16,185,129,0.12);
+      border: 1px solid rgba(16,185,129,0.22);
+      color: var(--green);
+    }
+    .confirm-role.guest {
+      background: rgba(0,212,200,0.12);
+      border: 1px solid rgba(0,212,200,0.22);
+      color: var(--purple-light);
+    }
+
+    .confirm-code-box {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      padding: 20px 32px;
+      display: inline-block;
+    }
+  </style>
+  <script src="bg.js"></script>
+  <script src="notif.js"></script>
+  <script src="logo-anim.js"></script>
+</head>
+<body>
+<div class="container">
+
+  <div class="header" style="justify-content:center">
+    <!-- header vide sur index, le logo est dans le hero -->
+  </div>
+
+  <!-- ─── STEP 1 : PRÉNOM ─── -->
+  <div class="step active" id="step1">
+    <div style="text-align:center;padding:40px 0 0">
+      <div class="logo-hero">
+        <img src="logo.png" alt="ZPEED Music" class="logo-hero-img">
+      </div>
+      <div class="hero-sub" style="margin-top:18px">La musique, ensemble</div>
+    </div>
+
+    <div class="beta-pill">🧪 Version bêta · Test réel</div>
+
+    <div style="margin-top:4px">
+      <label class="label">Ton prénom</label>
+      <input class="input" id="userName" placeholder="Marc, Julie, Thomas..." style="font-size:1rem;text-align:center"
+             autocomplete="given-name" autocorrect="off" autocapitalize="words"
+             onkeydown="if(event.key==='Enter')goToStep2()">
+    </div>
+
+    <button class="btn btn-primary" onclick="goToStep2()">
+      Continuer →
+    </button>
+  </div>
+
+  <!-- ─── STEP 2 : CHOISIR SON RÔLE ─── -->
+  <div class="step" id="step2">
+    <div style="text-align:center;padding:8px 0">
+      <div style="font-size:0.9rem;color:var(--text2);font-weight:400">Bonjour <strong id="nameDisplay" style="color:var(--text);font-weight:600"></strong> 👋</div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:1.35rem;font-weight:700;letter-spacing:-0.5px;margin-top:6px">
+        Que veux-tu faire ?
+      </div>
+    </div>
+
+    <!-- Créer une soirée -->
+    <div class="role-card host-card" onclick="createSession()">
+      <div class="role-icon">🎧</div>
+      <div class="role-name">Crée une soirée</div>
+      <div class="role-desc">Tu deviens HOST · Tu gères la queue<br>et l'enceinte depuis ton téléphone</div>
+    </div>
+
+    <div class="divider">ou</div>
+
+    <!-- Rejoindre -->
+    <div class="role-card guest-card" onclick="focusFirstEmptyBox()">
+      <div class="role-icon">🎤</div>
+      <div class="role-name">Rejoins une soirée</div>
+      <div class="role-desc">Entre le code à 4 caractères du HOST</div>
+      <div class="code-boxes" onclick="event.stopPropagation()">
+        <input class="code-box" maxlength="1" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+        <input class="code-box" maxlength="1" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+        <input class="code-box" maxlength="1" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+        <input class="code-box" maxlength="1" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+      </div>
+    </div>
+
+    <button class="btn btn-secondary" onclick="goToStep1()">← Retour</button>
+  </div>
+
+  <!-- ─── STEP 3 : CONFIRMATION ─── -->
+  <div class="step" id="step3">
+    <div style="text-align:center;padding:20px 0" id="confirmContent">
+      <!-- rempli par JS -->
+    </div>
+    <button class="btn btn-primary" id="enterBtn" onclick="enterApp()">
+      Entrer dans la session →
+    </button>
+    <button class="btn btn-secondary" onclick="goToStep2()">← Retour</button>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+  let userName = '';
+  let sessionData = null;
+
+  function goToStep1() {
+    setStep('step1');
+  }
+
+  function goToStep2() {
+    userName = document.getElementById('userName').value.trim();
+    if (!userName) { showToast('⚠️ Entre ton prénom'); return; }
+    document.getElementById('nameDisplay').textContent = userName;
+    setStep('step2');
+
+    // Si URL avec ?code= (QR scanné) → remplir les boxes automatiquement
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlCode = urlParams.get('code');
+    if (urlCode) {
+      fillCodeBoxes(urlCode.toUpperCase());
+    }
+  }
+
+  // ─── 6-BOX CODE INPUT ───
+  function getBoxes() {
+    return Array.from(document.querySelectorAll('.code-box'));
+  }
+  function getAllCode() {
+    return getBoxes().map(b => b.value.toUpperCase()).join('');
+  }
+  function fillCodeBoxes(code) {
+    const boxes = getBoxes();
+    code.split('').forEach((ch, i) => {
+      if (boxes[i]) { boxes[i].value = ch; boxes[i].classList.add('filled'); }
+    });
+    if (code.length === 4) {
+      setTimeout(() => joinSession(), 300);
+    }
+  }
+  function focusFirstEmptyBox() {
+    const boxes = getBoxes();
+    const empty = boxes.find(b => !b.value);
+    (empty || boxes[3]).focus();
+  }
+
+  // Init les boxes après DOM prêt
+  function initCodeBoxes() {
+    const boxes = getBoxes();
+    boxes.forEach((box, i) => {
+      box.addEventListener('input', e => {
+        const val = e.target.value.replace(/[^a-zA-Z0-9]/g,'').toUpperCase().slice(-1);
+        e.target.value = val;
+        e.target.classList.toggle('filled', !!val);
+        if (val && i < 3) boxes[i+1].focus();
+        if (getAllCode().length === 4) setTimeout(() => joinSession(), 200);
+      });
+      box.addEventListener('keydown', e => {
+        if (e.key === 'Backspace') {
+          if (!box.value && i > 0) { boxes[i-1].value = ''; boxes[i-1].classList.remove('filled'); boxes[i-1].focus(); }
+          else { box.value = ''; box.classList.remove('filled'); }
+          e.preventDefault();
+        }
+        if (e.key === 'ArrowLeft' && i > 0) boxes[i-1].focus();
+        if (e.key === 'ArrowRight' && i < 3) boxes[i+1].focus();
+      });
+      box.addEventListener('paste', e => {
+        e.preventDefault();
+        const pasted = (e.clipboardData || window.clipboardData).getData('text')
+          .replace(/[^a-zA-Z0-9]/g,'').toUpperCase().slice(0,4);
+        fillCodeBoxes(pasted);
+      });
+      box.addEventListener('focus', () => box.select());
+    });
+  }
+  document.addEventListener('DOMContentLoaded', initCodeBoxes);
+
+  function setStep(id) {
+    document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  // ─── CRÉER UNE SESSION (HOST) ───
+  async function createSession() {
+    showToast('⏳ Création de la session...');
+    try {
+      const res = await fetch('/api/session/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hostName: userName })
+      });
+      const data = await res.json();
+      if (!data.success) { showToast('❌ Erreur serveur'); return; }
+
+      sessionData = { role: 'host', ...data };
+
+      localStorage.setItem('zpeed_code',       data.code);
+      localStorage.setItem('zpeed_role',       'host');
+      localStorage.setItem('zpeed_hostId',     data.hostId);
+      localStorage.setItem('zpeed_hostName',   userName);
+      localStorage.setItem('zpeed_userName',   userName);
+      localStorage.setItem('zpeed_qr',         data.qrDataUrl);
+      // Save raw QR matrix for live canvas renderer
+      if (data.qrMatrix) {
+        localStorage.setItem('zpeed_qr_matrix', JSON.stringify(data.qrMatrix));
+        localStorage.setItem('zpeed_qr_size',   String(data.qrSize));
+      }
+
+      showConfirmHost(data);
+      setStep('step3');
+    } catch(e) {
+      showToast('❌ Impossible de créer la session');
+    }
+  }
+
+  // ─── REJOINDRE UNE SESSION (GUEST) ───
+  async function joinSession() {
+    const code = getAllCode();
+    if (code.length < 4) { showToast('⚠️ Entre le code à 4 chiffres'); return; }
+
+    try {
+      const res = await fetch('/api/session/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, guestName: userName })
+      });
+      const data = await res.json();
+      if (!data.success) { showToast('❌ Code invalide ou session terminée'); return; }
+
+      sessionData = { role: 'guest', code, ...data };
+
+      localStorage.setItem('zpeed_code',      code);
+      localStorage.setItem('zpeed_role',      'guest');
+      localStorage.setItem('zpeed_guestId',   data.guestId);
+      localStorage.setItem('zpeed_guestName', userName);
+      localStorage.setItem('zpeed_userName',  userName);
+      localStorage.setItem('zpeed_hostName',  data.hostName);
+
+      showConfirmGuest(data, code);
+      setStep('step3');
+    } catch(e) {
+      showToast('❌ Impossible de rejoindre la session');
+    }
+  }
+
+  function showConfirmHost(data) {
+    document.getElementById('confirmContent').innerHTML = `
+      <div style="font-size:3rem;margin-bottom:16px">🎧</div>
+      <div class="confirm-role host" style="margin-bottom:14px">HOST</div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:1.25rem;font-weight:700;letter-spacing:-0.5px;margin-bottom:8px">
+        Tu contrôles la soirée
+      </div>
+      <div style="font-size:0.85rem;color:var(--text2);margin-bottom:24px;font-weight:400">
+        Partage le code ou le QR à tes guests
+      </div>
+      <div class="confirm-code-box">
+        <div style="font-size:0.65rem;color:var(--text2);font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px">Code session</div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:2.2rem;font-weight:800;color:var(--purple-light);letter-spacing:8px">${data.code}</div>
+      </div>
+    `;
+    document.getElementById('enterBtn').textContent = 'Ouvrir le dashboard →';
+  }
+
+  function showConfirmGuest(data, code) {
+    document.getElementById('confirmContent').innerHTML = `
+      <div style="font-size:3rem;margin-bottom:16px">🎤</div>
+      <div class="confirm-role guest" style="margin-bottom:14px">GUEST</div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:1.25rem;font-weight:700;letter-spacing:-0.5px;margin-bottom:8px">
+        Bienvenue dans la soirée
+      </div>
+      <div style="font-size:0.85rem;color:var(--text2);font-weight:400">
+        Session de <strong style="color:var(--text);font-weight:600">${data.hostName}</strong>
+        &nbsp;·&nbsp; Code <strong style="color:var(--purple-light);font-weight:600">${code}</strong>
+      </div>
+    `;
+    document.getElementById('enterBtn').textContent = 'Proposer de la musique →';
+  }
+
+  function enterApp() {
+    if (!sessionData) return;
+    if (sessionData.role === 'host') {
+      window.location.href = 'host.html';
+    } else {
+      window.location.href = `guest.html?code=${sessionData.code}`;
+    }
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+</script>
+</body>
+</html>

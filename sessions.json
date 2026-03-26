@@ -1,0 +1,934 @@
+{
+  "1ZLZ": {
+    "code": "1ZLZ",
+    "hostId": "cd79a449-aec3-4c73-a1df-e0668951b304",
+    "hostName": "Marc",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T01:19:21.387Z"
+  },
+  "HUGD": {
+    "code": "HUGD",
+    "hostId": "5d55772a-5b16-4147-b246-6f0f821c8173",
+    "hostName": "tt",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T01:19:36.780Z"
+  },
+  "Q68X": {
+    "code": "Q68X",
+    "hostId": "5f834275-9bac-472d-be4f-c090e6da206f",
+    "hostName": "JAc",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T01:22:19.923Z"
+  },
+  "PEGV": {
+    "code": "PEGV",
+    "hostId": "505b0b1b-0168-44e3-a2b4-3adadce26c4b",
+    "hostName": "helo",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T01:22:43.767Z"
+  },
+  "Q7MW": {
+    "code": "Q7MW",
+    "hostId": "e78e973d-5fe4-473a-8159-e4ba54bbd6db",
+    "hostName": "miryam",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T01:28:55.720Z"
+  },
+  "PRM5": {
+    "code": "PRM5",
+    "hostId": "235282f8-6c12-413b-bb3a-3e1c349b0e61",
+    "hostName": "g",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T01:31:58.393Z"
+  },
+  "HUOF": {
+    "code": "HUOF",
+    "hostId": "c80039cd-7ac0-4063-887f-09a575fe1f30",
+    "hostName": "h",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T01:33:20.436Z"
+  },
+  "AO7D": {
+    "code": "AO7D",
+    "hostId": "3c57f2d2-558e-4cd1-bb58-732b0ddea97a",
+    "hostName": "g",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T01:34:35.143Z"
+  },
+  "EE7V": {
+    "code": "EE7V",
+    "hostId": "9436390c-be01-412b-85f6-eacd207ea7d2",
+    "hostName": "thibaud",
+    "guestCount": 2,
+    "queue": [
+      {
+        "id": "24ced192-31b6-4ca2-80e0-7282af66c204",
+        "videoId": "a5uQMwRMHcs",
+        "title": "Daft Punk - Instant Crush (Official Video) ft. Julian Casablancas",
+        "channel": "Daft Punk",
+        "thumbnail": "https://i.ytimg.com/vi/a5uQMwRMHcs/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBPW0axgkYtNqNfvsLcqYtV02xMYg",
+        "duration": "5:40",
+        "platform": "youtube",
+        "votes": 1,
+        "proposedBy": "MARCO",
+        "voters": [
+          "b52202dc-9721-4cee-afb9-379effad6903"
+        ]
+      },
+      {
+        "id": "e870ccec-93c8-48e7-a6c7-fc42091995b4",
+        "videoId": "sO4kJpuFE3g",
+        "title": "Grand Oral I Laetitia Mampaka  - \" Maitre, j'ai volé la coupe du monde\"",
+        "channel": "LAETITIA MAMPAKA 💋",
+        "thumbnail": "https://i.ytimg.com/vi/sO4kJpuFE3g/hqdefault.jpg?sqp=-oaymwEcCOADEI4CSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLDglfdHXKcoNEQ4Nn4biB2wuRMIgA",
+        "duration": "3:28",
+        "platform": "youtube",
+        "votes": 1,
+        "proposedBy": "MARCO",
+        "voters": [
+          "b52202dc-9721-4cee-afb9-379effad6903"
+        ]
+      }
+    ],
+    "currentTrack": null,
+    "guests": [
+      {
+        "id": "475be846-1e8f-4d0c-8f5a-af87f074a40b",
+        "name": "jo"
+      },
+      {
+        "id": "b52202dc-9721-4cee-afb9-379effad6903",
+        "name": "MARCO"
+      }
+    ],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T01:37:24.352Z"
+  },
+  "D8AI": {
+    "code": "D8AI",
+    "hostId": "1f0899ac-5d98-447c-b42a-cae4dbaa2ca1",
+    "hostName": "g",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T01:43:59.915Z"
+  },
+  "4N7G": {
+    "code": "4N7G",
+    "hostId": "bddcd4d9-933e-4d9e-970b-b60416a7dc6a",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T01:45:52.931Z"
+  },
+  "ZHVO": {
+    "code": "ZHVO",
+    "hostId": "e9bfabf6-049e-4b96-b9cb-c0eea2299678",
+    "hostName": "Julien",
+    "guestCount": 1,
+    "queue": [
+      {
+        "id": "6eb7f7fd-31e5-407e-8841-dc3f69729c94",
+        "videoId": "a5uQMwRMHcs",
+        "title": "Daft Punk - Instant Crush (Official Video) ft. Julian Casablancas",
+        "channel": "Daft Punk",
+        "thumbnail": "https://i.ytimg.com/vi/a5uQMwRMHcs/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBPW0axgkYtNqNfvsLcqYtV02xMYg",
+        "duration": "5:40",
+        "platform": "youtube",
+        "votes": 1,
+        "proposedBy": "Hello",
+        "voters": [
+          "2f78965a-f0ab-48f3-b1d6-a1fde47c5d27"
+        ]
+      }
+    ],
+    "currentTrack": null,
+    "guests": [
+      {
+        "id": "2f78965a-f0ab-48f3-b1d6-a1fde47c5d27",
+        "name": "Hello"
+      }
+    ],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T01:47:45.711Z"
+  },
+  "O0E3": {
+    "code": "O0E3",
+    "hostId": "674dccbe-0f26-40fd-88a5-bcae3488e4d3",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T01:49:19.936Z"
+  },
+  "F0HX": {
+    "code": "F0HX",
+    "hostId": "f33574ec-938f-43a2-b390-38cd842dd65c",
+    "hostName": "gg",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T01:50:44.982Z"
+  },
+  "TD2V": {
+    "code": "TD2V",
+    "hostId": "13472bab-3caa-47d1-bfd0-02cc6fd98f6e",
+    "hostName": "Fossati",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T01:51:39.280Z"
+  },
+  "JP31": {
+    "code": "JP31",
+    "hostId": "b987cef6-8c87-4234-8ea0-238337e2c33c",
+    "hostName": "Fossati",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T01:52:25.991Z"
+  },
+  "9MZ1": {
+    "code": "9MZ1",
+    "hostId": "0036ca1a-4678-4451-87e8-b20bda486969",
+    "hostName": "Fossati",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T01:52:29.147Z"
+  },
+  "D17G": {
+    "code": "D17G",
+    "hostId": "0c608429-715a-4f32-a301-bfe31f4341af",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T01:53:35.779Z"
+  },
+  "CLUM": {
+    "code": "CLUM",
+    "hostId": "46b025f7-76bc-4789-8395-1e9b4a4c5013",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T01:55:03.704Z"
+  },
+  "9NZU": {
+    "code": "9NZU",
+    "hostId": "2d7c0111-d3ba-4da4-b4b4-e58ce26895d4",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T01:56:42.915Z"
+  },
+  "MRUT": {
+    "code": "MRUT",
+    "hostId": "e59a6b95-4e8c-4b04-9e1e-6f3d29879882",
+    "hostName": "Fossati",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T01:59:44.872Z"
+  },
+  "7KB3": {
+    "code": "7KB3",
+    "hostId": "552f691d-afc0-4e63-8309-7022fb02ad2b",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": {
+      "id": "e9214403-8e78-4a13-83c8-58a8a66f456a",
+      "videoId": "LYAvhujK4nA",
+      "title": "Dalida, Alain Delon - Paroles, paroles",
+      "channel": "Dalida",
+      "thumbnail": "https://i.ytimg.com/vi/LYAvhujK4nA/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBJDGuomNPz2gjlR4t6NRyG1OBPAw",
+      "duration": "4:09",
+      "votes": 1,
+      "proposedBy": "Thibaud",
+      "voters": [
+        "host"
+      ]
+    },
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T02:00:07.726Z"
+  },
+  "LY0D": {
+    "code": "LY0D",
+    "hostId": "c25da61e-0fd1-428d-be64-ed6fdb6da0e9",
+    "hostName": "Thibaud",
+    "guestCount": 1,
+    "queue": [],
+    "currentTrack": {
+      "id": "4de727ae-795a-4688-a535-88028dd197e5",
+      "videoId": "a4Ujexj9YGs",
+      "title": "The Long One (Comprising of ‘You Never Give Me Your Money’, ’Sun King’/’Mean Mr...",
+      "channel": "The Beatles",
+      "thumbnail": "https://i.ytimg.com/vi/a4Ujexj9YGs/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLCqcNw8HPjb1w_80Uc1jvmEu4OuBg",
+      "duration": "16:11",
+      "platform": "youtube",
+      "votes": 1,
+      "proposedBy": "Julia",
+      "voters": [
+        "08aaece7-0687-4df0-a27d-23c73280920b"
+      ]
+    },
+    "guests": [
+      {
+        "id": "08aaece7-0687-4df0-a27d-23c73280920b",
+        "name": "Julia"
+      }
+    ],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T02:02:15.533Z"
+  },
+  "PZQT": {
+    "code": "PZQT",
+    "hostId": "15c836aa-48c7-4ee4-932b-a6782fff1c4d",
+    "hostName": "Marc",
+    "guestCount": 1,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [
+      {
+        "id": "31823555-672c-4a18-93ea-9783f46054e5",
+        "name": "hugue"
+      }
+    ],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T02:10:36.592Z",
+    "hostSpotify": {
+      "tokens": {
+        "access_token": "BQBORcfh6YNGSJ-pMSuhk6504GbmE3GvuBg0j7DwdNGh9KWfVAw2OMDzkRZwaQ0zbgAlQy5a5nq7sWjvMQbrEC_Sx-bBQGgXO_kAp3a-fJBWEWAb5W4YtCilOBOQouns8dhR4pq2IpklXEo_xJLCW74-XprZvEMpLCuUcxQLA4hi86Md_Whq0V38cBHsdxFW7fUuPtQu_APml0mtqLW4nJlpBz7vGtg6gDnkOHf05Tc6Tlx81mRvnMYahhH9JFeV",
+        "refresh_token": "AQAsQPi-P3ljutd_G302f4adm4vf1vmjRp-9kwJyyfkqExYAZ7m24SpA-BX9UjuUi2lCTu-cJkyKAsp03frzSrgA0q4412T2zXYeBWNzVr3QeGAQ8Xq8qwkMOlWzpjaXMxk"
+      },
+      "profile": {
+        "name": "ouragan_6",
+        "picture": "https://i.scdn.co/image/ab6775700000ee856a99604e5132278c3c7bdfde",
+        "email": "tfossati@gmail.com"
+      }
+    }
+  },
+  "6Y14": {
+    "code": "6Y14",
+    "hostId": "d11552a5-d34b-4a9b-99a7-e0e82491a388",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T02:13:09.209Z"
+  },
+  "34NO": {
+    "code": "34NO",
+    "hostId": "d3d5008d-0df5-4db1-817f-db918801b8d3",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T02:13:21.888Z"
+  },
+  "KRM9": {
+    "code": "KRM9",
+    "hostId": "cfd76942-0678-4793-872d-178c4ae4e2d9",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T02:14:50.953Z"
+  },
+  "WV6P": {
+    "code": "WV6P",
+    "hostId": "682334f2-777b-4808-9918-496ce263d719",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T02:21:47.180Z"
+  },
+  "AWHN": {
+    "code": "AWHN",
+    "hostId": "eb292443-36de-4e3c-bb45-514415ef0ab4",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T02:22:01.946Z"
+  },
+  "XDBZ": {
+    "code": "XDBZ",
+    "hostId": "3a317c58-5a43-40a1-9fc2-618080ece691",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T02:22:15.785Z"
+  },
+  "61T7": {
+    "code": "61T7",
+    "hostId": "2c978119-fdc6-4e7d-890b-4c8406ee1d54",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T07:38:44.930Z"
+  },
+  "1L4Z": {
+    "code": "1L4Z",
+    "hostId": "a4aaa9bc-e1d4-4e60-a69b-8db80122dbf9",
+    "hostName": "Thibaud",
+    "guestCount": 4,
+    "queue": [],
+    "currentTrack": {
+      "id": "c01d9141-0d79-4da0-ba76-765fefb38325",
+      "videoId": "a5uQMwRMHcs",
+      "title": "Daft Punk - Instant Crush (Official Video) ft. Julian Casablancas",
+      "channel": "Daft Punk",
+      "thumbnail": "https://i.ytimg.com/vi/a5uQMwRMHcs/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBPW0axgkYtNqNfvsLcqYtV02xMYg",
+      "duration": "5:40",
+      "votes": 1,
+      "proposedBy": "Thibaud",
+      "voters": [
+        "host"
+      ]
+    },
+    "guests": [
+      {
+        "id": "3ac5df98-fecb-4025-a689-e9ae1c253acc",
+        "name": "Julia"
+      },
+      {
+        "id": "755d173d-0426-40c3-93e5-93550cc93048",
+        "name": "Julia"
+      },
+      {
+        "id": "8b11bfd4-07d6-4b51-8701-d44031092d6c",
+        "name": "Julia"
+      },
+      {
+        "id": "b6ea2dcb-6574-4197-950a-4e57ba96cfae",
+        "name": "Julia"
+      }
+    ],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T07:39:29.828Z"
+  },
+  "G476": {
+    "code": "G476",
+    "hostId": "12612fbe-d09e-42e9-b7fb-3d03af08a680",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [
+      {
+        "id": "2eb17970-b37b-427e-ae1b-72fc6aac5e7f",
+        "videoId": "TCd6PfxOy0Y",
+        "title": "Daft Punk - Veridis Quo (Official Audio)",
+        "channel": "Daft Punk",
+        "thumbnail": "https://i.ytimg.com/vi/TCd6PfxOy0Y/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBCj1MZNPF0N0TKXQKeyR85tZL4pA",
+        "duration": "5:46",
+        "votes": 1,
+        "proposedBy": "Thibaud",
+        "voters": [
+          "host"
+        ]
+      },
+      {
+        "id": "c9f29ea0-bd26-43d4-a203-24c0834da18a",
+        "videoId": "-uRbg9E-o4k",
+        "title": "Patrick Habirora : \"Ce PFL va être une dinguerie !\" (RMC FIGHTER CLUB)",
+        "channel": "RMC Sport Combat",
+        "thumbnail": "https://i.ytimg.com/vi/-uRbg9E-o4k/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLDZTCYAX8VJMABx2j1ZMuNgJJNoPA",
+        "duration": "1:17:22",
+        "votes": 1,
+        "proposedBy": "Thibaud",
+        "voters": [
+          "host"
+        ]
+      }
+    ],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T08:59:24.849Z"
+  },
+  "L9K5": {
+    "code": "L9K5",
+    "hostId": "e11972bb-b52d-4c4c-b27c-fb1136b60cd4",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T09:01:43.944Z"
+  },
+  "K016": {
+    "code": "K016",
+    "hostId": "0e1fd953-ae94-4964-b394-ff07424d5217",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [
+      {
+        "id": "2abe18db-ac81-4fb0-86b9-34782faedcc6",
+        "videoId": "HR7y3f18Ug8",
+        "title": "Daft Punk Groove Never Dies 🎸🤖 | Chill Disco, Electro Funk, Neo Soul, Retro Groove Playlist",
+        "channel": "Disco Punk",
+        "thumbnail": "https://i.ytimg.com/vi/HR7y3f18Ug8/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLAwKz0fBysqNs-EKfssV3rOvAwrZQ",
+        "duration": "2:01:36",
+        "votes": 1,
+        "proposedBy": "Thibaud",
+        "voters": [
+          "host"
+        ]
+      }
+    ],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T09:02:03.755Z"
+  },
+  "X1FJ": {
+    "code": "X1FJ",
+    "hostId": "f8009e85-6087-495d-8915-14e8507c00fe",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T09:09:47.534Z"
+  },
+  "7XS4": {
+    "code": "7XS4",
+    "hostId": "be0f4288-bbb2-4304-88e9-317c1ebd465b",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T09:20:40.812Z"
+  },
+  "VF1I": {
+    "code": "VF1I",
+    "hostId": "1b3b5eb9-2e4e-40ff-9abe-6f73a2e6d18d",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T09:20:42.750Z"
+  },
+  "AECL": {
+    "code": "AECL",
+    "hostId": "c3efac62-c9e3-4060-a05b-a378613613e1",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [
+      {
+        "id": "ebaed1ba-e0ed-4d63-a43f-2228553c06ed",
+        "videoId": "co-TFLbaZAE",
+        "title": "“Gabriela” Performance Video | KATSEYE",
+        "channel": "KATSEYE",
+        "thumbnail": "https://i.ytimg.com/vi/co-TFLbaZAE/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLA8Q1rvfCAHdPatw3HN4y306y4fzA",
+        "duration": "3:18",
+        "votes": 1,
+        "proposedBy": "Thibaud",
+        "voters": [
+          "host"
+        ]
+      }
+    ],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T09:28:16.026Z"
+  },
+  "58KI": {
+    "code": "58KI",
+    "hostId": "9c9b31ed-cbcb-428e-8d5d-3954cb016c84",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T09:34:05.644Z"
+  },
+  "9FDA": {
+    "code": "9FDA",
+    "hostId": "90bd1b71-2cc9-4a08-a97f-700304affdb3",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T09:34:25.269Z"
+  },
+  "39E4": {
+    "code": "39E4",
+    "hostId": "091d8166-7820-451b-88d0-5a4333d0a75e",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [
+      {
+        "id": "131a1f91-9e24-4b6f-b39f-9a171f1b9367",
+        "videoId": "X91S0C7nmiY",
+        "title": "AaRON - Blouson Noir (Clip Officiel)",
+        "channel": "AaRON",
+        "thumbnail": "https://i.ytimg.com/vi/X91S0C7nmiY/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLASOf4SiSf8zS8mXeBw7-qqZ-eeZw",
+        "duration": "5:05",
+        "votes": 1,
+        "proposedBy": "Thibaud",
+        "voters": [
+          "host"
+        ]
+      }
+    ],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T09:34:38.655Z"
+  },
+  "ROY2": {
+    "code": "ROY2",
+    "hostId": "41fed4a7-7387-4211-a0ca-d045eefbce37",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T09:37:16.143Z"
+  },
+  "6Y82": {
+    "code": "6Y82",
+    "hostId": "adc9f6b6-d3b1-4d6e-899e-efba6a8a9839",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T09:37:27.578Z"
+  },
+  "WO2X": {
+    "code": "WO2X",
+    "hostId": "be23d9fb-7420-4282-9c6f-eda5c7152fd8",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T09:56:04.301Z"
+  },
+  "OCNH": {
+    "code": "OCNH",
+    "hostId": "02d52364-31d4-46b4-bd2d-68e7cba3b7bb",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T10:00:48.207Z"
+  },
+  "NPQY": {
+    "code": "NPQY",
+    "hostId": "3ac49b47-cfe5-44ef-b75d-e1fe747ce23d",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T10:02:00.873Z"
+  },
+  "QFFG": {
+    "code": "QFFG",
+    "hostId": "d0f79c43-22d5-40a6-8c2a-36d4e63dd9a2",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T10:02:43.951Z"
+  },
+  "T3F7": {
+    "code": "T3F7",
+    "hostId": "466459af-d70f-4af0-867e-9d1d898487c3",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T10:03:51.732Z"
+  },
+  "HCG1": {
+    "code": "HCG1",
+    "hostId": "dd3c12d0-cfcc-4d9f-8dc3-cb74e8eeb616",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T10:17:18.209Z"
+  },
+  "L099": {
+    "code": "L099",
+    "hostId": "f56f61ae-9b56-4ffe-b68d-138a9fa5a8df",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T10:21:16.218Z"
+  },
+  "KXCM": {
+    "code": "KXCM",
+    "hostId": "a3f16d95-06ff-4a15-8053-c8afe799ec36",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T10:21:44.208Z"
+  },
+  "GCVQ": {
+    "code": "GCVQ",
+    "hostId": "56d7ebee-a088-48f7-a546-1f1a0a1ad5a4",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T10:22:06.978Z"
+  },
+  "3I85": {
+    "code": "3I85",
+    "hostId": "643281e2-7ac3-4fc2-930d-6e7902b861ed",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": {
+      "id": "dfb0bc03-2b37-4254-89d5-5160d24862cd",
+      "videoId": "yqttcyDve-M",
+      "title": "DUFT PUNK – Random Access Memories (Full CD) 2013",
+      "channel": "A DANCE MUSIC",
+      "thumbnail": "https://i.ytimg.com/vi/yqttcyDve-M/hqdefault.jpg?sqp=-oaymwEcCOADEI4CSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBGToexUncHRO-EIs8frKyMdkTtcA",
+      "duration": "1:14:31",
+      "votes": 1,
+      "proposedBy": "Thibaud",
+      "voters": [
+        "host"
+      ]
+    },
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T10:24:46.653Z"
+  },
+  "BSZW": {
+    "code": "BSZW",
+    "hostId": "6c5203e1-64dd-4fdb-a2f7-e62dc8b88e63",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T10:30:02.596Z"
+  },
+  "WM4U": {
+    "code": "WM4U",
+    "hostId": "c363b646-4d79-408f-a449-99fae79d361a",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T10:40:47.385Z"
+  },
+  "GHC1": {
+    "code": "GHC1",
+    "hostId": "cbc10043-24ab-42d7-804f-19ed61c69a10",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T10:50:11.065Z"
+  },
+  "9YZ5": {
+    "code": "9YZ5",
+    "hostId": "5e24911d-37d3-47ab-ae23-afff8f1412c9",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T10:59:08.680Z"
+  },
+  "66A4": {
+    "code": "66A4",
+    "hostId": "1e9d71f3-90ce-4942-9eea-225556ddc43c",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T11:05:04.505Z"
+  },
+  "2VWJ": {
+    "code": "2VWJ",
+    "hostId": "13e3a2c3-ce60-457e-a9ce-a8f21b889646",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T11:08:14.405Z"
+  },
+  "GWH4": {
+    "code": "GWH4",
+    "hostId": "212432ee-9ba0-4cc8-ba4e-40ed97049a93",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T11:37:02.939Z"
+  },
+  "CD9O": {
+    "code": "CD9O",
+    "hostId": "497331e8-39b3-46e8-9bf5-ebca98d56fc7",
+    "hostName": "Thibaud",
+    "guestCount": 0,
+    "queue": [
+      {
+        "id": "c51d3213-e690-4995-8b3a-9167057c5d10",
+        "videoId": "yqttcyDve-M",
+        "title": "DUFT PUNK – Random Access Memories (Full CD) 2013",
+        "channel": "A DANCE MUSIC",
+        "thumbnail": "https://i.ytimg.com/vi/yqttcyDve-M/hqdefault.jpg?sqp=-oaymwEcCOADEI4CSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLBGToexUncHRO-EIs8frKyMdkTtcA",
+        "duration": "1:14:31",
+        "votes": 1,
+        "proposedBy": "Thibaud",
+        "voters": [
+          "host"
+        ]
+      }
+    ],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T11:47:52.858Z"
+  },
+  "PVXI": {
+    "code": "PVXI",
+    "hostId": "0ef15b7f-1ada-4e2f-ba71-5c7f6274dad2",
+    "hostName": "thib",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T12:22:43.611Z"
+  },
+  "W96N": {
+    "code": "W96N",
+    "hostId": "a35ad086-09cf-4a01-b1b8-7804979709a8",
+    "hostName": "uu",
+    "guestCount": 0,
+    "queue": [],
+    "currentTrack": null,
+    "guests": [],
+    "hostGoogle": null,
+    "createdAt": "2026-03-26T13:19:53.314Z"
+  }
+}
