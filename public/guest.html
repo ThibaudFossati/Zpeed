@@ -147,6 +147,7 @@
   <div style="background:rgba(255,165,0,0.06);border:1px solid rgba(255,165,0,0.14);border-radius:99px;padding:5px 14px;text-align:center;font-size:0.62rem;color:#FFA500;font-weight:600;margin-bottom:4px;letter-spacing:0.3px;align-self:center">
     🧪 Bêta · Propose tes sons via YouTube
   </div>
+  <div id="guestRoomHint" style="display:none;font-size:0.65rem;color:var(--text2);text-align:center;margin-bottom:6px;line-height:1.35"></div>
 
   <!-- HEADER -->
   <div class="header">
@@ -202,10 +203,10 @@
 
     <div id="searchSection">
       <div class="section-title">🔍 Chercher un titre</div>
-      <div class="input-group">
-        <input class="input" id="searchInput" placeholder="Artiste, titre, vibe..."
+      <div class="input-group input-group--row" id="guestSearchGroup">
+        <input class="input input--search" id="searchInput" placeholder="Artiste, titre, vibe…"
           onkeydown="if(event.key==='Enter') search()">
-        <button class="btn btn-primary btn-small" onclick="search()" style="white-space:nowrap">Chercher</button>
+        <button type="button" class="btn btn-primary btn-block" id="searchSubmitBtn" onclick="search()">Chercher</button>
       </div>
       <div id="searchResults" style="margin-bottom:16px"></div>
     </div>
@@ -220,6 +221,7 @@
   <!-- ═══ PANEL : VOTER ═══ -->
   <div class="tab-panel" id="panel-vote">
     <div class="section-title">🗳 Voter pour les sons</div>
+    <div id="zpeedGuestTop3" class="zpeed-top3-wrap" aria-live="polite"></div>
     <div id="voteList">
       <div class="empty">
         <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3L15.5 9H20.5L16.5 13L18 19.5L12 16L6 19.5L7.5 13L3.5 9H8.5L12 3Z"/></svg></div>
@@ -412,7 +414,11 @@
   socket.on('connect', joinRoom);
 
   let queue         = [];
+  let roomMeta      = {};
   let votedTracks   = new Set();
+  /** @type {Record<string, { v: number, s: string }>} */
+  let prevTrackSnap = {};
+  const VALIDATION_LABEL = 'VALIDÉ'; // switch here later (e.g. "APPROVED")
 
   // Flat music-note placeholder for broken thumbnails
   const THUMB_FALLBACK = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" fill="#1a1a24"/><path d="M9 17V6l10-2V15" stroke="#00d4c8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="7" cy="17" r="2.2" fill="#00d4c8"/><circle cx="17" cy="15" r="2.2" fill="#00d4c8"/></svg>');
@@ -448,21 +454,43 @@
   // ─────────────────────────────────────────────
   // SEARCH
   // ─────────────────────────────────────────────
+  function guestSearchSkeleton(n = 4) {
+    const row = () => `<div class="skeleton-row"><div class="skeleton-avatar"></div><div class="skeleton-lines"><div class="skeleton-line w-90"></div><div class="skeleton-line w-60"></div></div></div>`;
+    return `<div class="skeleton-list" aria-busy="true" aria-label="Recherche…">${Array.from({ length: n }, row).join('')}</div>`;
+  }
+
   async function search() {
     const q = document.getElementById('searchInput').value.trim();
     if (!q) return;
-    document.getElementById('searchResults').innerHTML =
-      `<div style="text-align:center;color:var(--text2);padding:16px">🔍 Recherche...</div>`;
+    const goBtn = document.getElementById('searchSubmitBtn');
+    if (goBtn) {
+      goBtn.classList.add('is-loading');
+      goBtn.disabled = true;
+    }
+    document.getElementById('searchResults').innerHTML = guestSearchSkeleton(4);
 
     try {
       // Always search YouTube
       const [ytRes, spRes] = await Promise.allSettled([
         fetch(`/api/search?q=${encodeURIComponent(q)}`).then(r => r.json()),
-        fetch(`/api/spotify/search?q=${encodeURIComponent(q)}&code=${code}`).then(r => r.json()).catch(() => [])
+        fetch(`/api/spotify/search?q=${encodeURIComponent(q)}&code=${code}`)
+          .then(async r => {
+            const body = await r.json().catch(() => ({}));
+            if (!r.ok) return { __error: true, status: r.status, body };
+            return body;
+          })
+          .catch(() => ({ __error: true, status: 0, body: { message: 'Spotify unreachable' } }))
       ]);
 
       const ytTracks = (ytRes.status === 'fulfilled' ? ytRes.value : []).map(t => ({ ...t, platform: 'youtube' }));
-      const spTracks = (spRes.status === 'fulfilled' && Array.isArray(spRes.value)) ? spRes.value : [];
+      const spValue  = spRes.status === 'fulfilled' ? spRes.value : [];
+      if (spValue && spValue.__error) {
+        const msg = spValue.body?.message || spValue.body?.error || 'Spotify search failed';
+        document.getElementById('searchResults').innerHTML =
+          `<div class="empty"><div class="empty-text">Spotify: ${msg}</div></div>`;
+        return;
+      }
+      const spTracks = Array.isArray(spValue) ? spValue : [];
       const results  = [...spTracks, ...ytTracks];
 
       if (!results.length) {
@@ -471,29 +499,59 @@
         return;
       }
 
-      document.getElementById('searchResults').innerHTML = results.map(t => `
-        <div class="search-result" onclick='propose(${JSON.stringify(t).replace(/'/g,"&#39;")})'>
-          <img class="search-thumb" src="${t.thumbnail||''}" onerror="this.style.display='none'">
-          <div style="flex:1;min-width:0">
-            <div style="font-weight:600;font-size:0.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.title}</div>
-            <div style="font-size:0.72rem;color:var(--text2);margin-top:2px">${t.channel} · ${t.duration||''}</div>
+      document.getElementById('searchResults').innerHTML = results.map(t => {
+        const enc = encodeURIComponent(JSON.stringify(t));
+        const devMockTag = (t.isMock || t.isDevMock)
+          ? `<span style="display:inline-flex;align-items:center;padding:2px 7px;border-radius:999px;border:1px solid rgba(255,255,255,0.14);font-size:0.62rem;font-weight:800;letter-spacing:0.04em;color:#9ee6b7;background:rgba(34,197,94,0.15)">DEV MOCK</span>`
+          : '';
+        return `
+        <div class="search-result track-card" role="button" tabindex="0"
+          data-track="${enc}"
+          onclick="proposeFromCard(this)">
+          <img class="search-thumb" src="${t.thumbnail||''}" onerror="this.style.display='none'" alt="">
+          <div style="flex:1;min-width:0;align-self:center">
+            <div class="host-result-title" style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:var(--font-title)">${t.title}</div>
+            <div style="font-size:0.875rem;color:var(--text2);margin-top:2px;display:flex;align-items:center;gap:7px;flex-wrap:wrap"><span>${t.channel} · ${t.duration||''}</span>${devMockTag}</div>
           </div>
-          <span style="font-size:0.65rem;background:${t.platform==='spotify'?'rgba(30,215,96,0.15)':'rgba(255,0,0,0.12)'};color:${t.platform==='spotify'?'#1ED760':'#FF4444'};padding:3px 7px;border-radius:99px;font-weight:600;white-space:nowrap;flex-shrink:0">${t.platform==='spotify'?'Spotify':'YT'}</span>
-        </div>
-      `).join('');
+          <div class="btn-add-plus" aria-hidden="true">+</div>
+        </div>`;
+      }).join('');
     } catch(e) {
       document.getElementById('searchResults').innerHTML =
         `<div class="empty"><div class="empty-text">Erreur de recherche</div></div>`;
+    } finally {
+      if (goBtn) {
+        goBtn.classList.remove('is-loading');
+        goBtn.disabled = false;
+      }
     }
   }
 
   // ─────────────────────────────────────────────
   // PROPOSE
   // ─────────────────────────────────────────────
-  function propose(track) {
+  function proposeFromCard(el) {
+    let track;
+    try {
+      const raw = el.getAttribute('data-track');
+      if (!raw) return;
+      track = JSON.parse(decodeURIComponent(raw));
+    } catch (e) {
+      showToast('Erreur — réessaie');
+      return;
+    }
     if (!isSubscribed) { showToast('💳 Abonne-toi pour proposer !'); return; }
-    if (proposedTracks.has(track.videoId)) { showToast('⚠️ Déjà proposé !'); return; }
-    proposedTracks.add(track.videoId);
+    const dedupeKey = track.spotifyId || track.videoId || `${track.title}|${track.channel || ''}`;
+    if (proposedTracks.has(dedupeKey)) { showToast('⚠️ Déjà proposé !'); return; }
+    if (el) el.classList.add('track-card--adding');
+    setTimeout(() => propose(track), 200);
+  }
+
+  function propose(track) {
+    if (!isSubscribed) { return; }
+    const dedupeKey = track.spotifyId || track.videoId || `${track.title}|${track.channel || ''}`;
+    if (proposedTracks.has(dedupeKey)) { return; }
+    proposedTracks.add(dedupeKey);
     socket.emit('track:propose', { code, guestId, guestName, track });
     document.getElementById('searchResults').innerHTML = '';
     document.getElementById('searchInput').value = '';
@@ -526,6 +584,19 @@
   // ─────────────────────────────────────────────
   // VOTE
   // ─────────────────────────────────────────────
+  function feedbackVoteTap(trackId, btn) {
+    if (btn) {
+      btn.classList.add('btn-vote--pop');
+      setTimeout(() => btn.classList.remove('btn-vote--pop'), 280);
+    }
+    const card = document.getElementById('vcard-' + trackId);
+    const score = card && card.querySelector('.vote-score');
+    if (score) {
+      score.classList.add('zpeed-pop');
+      setTimeout(() => score.classList.remove('zpeed-pop'), 300);
+    }
+  }
+
   function vote(trackId, value, btn) {
     if (votedTracks.has(trackId)) { showToast('⚠️ Déjà voté !'); return; }
     votedTracks.add(trackId);
@@ -534,6 +605,7 @@
     document.getElementById('statVoted').textContent = statVoted;
     // Haptic feedback
     if (navigator.vibrate) navigator.vibrate(value > 0 ? [30] : [15, 10, 15]);
+    feedbackVoteTap(trackId, btn);
     // Burst animation sur le bouton
     if (btn) spawnBurst(btn, value > 0 ? '+1 🔥' : '-1');
     // Réaction auto fire si upvote
@@ -542,7 +614,10 @@
 
   function react(trackId, emoji, silent = false) {
     socket.emit('track:react', { code, trackId, guestId, guestName, emoji });
-    if (!silent) spawnLocalEmoji(emoji, 3);
+    if (!silent) {
+      spawnReactionOnTrackCard(trackId, emoji);
+      spawnLocalEmoji(emoji, 3);
+    }
   }
 
   // ── Burst "+1" au-dessus du bouton ──
@@ -617,6 +692,93 @@
     return { color: '#FF3B1F', pct, pulse: true };
   }
 
+  function zpeedEscapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function zpeedHeatTier(votes, thNum) {
+    const mv = Math.max(0, votes | 0);
+    const th = Math.max(1, thNum || 1);
+    const ratio = mv / th;
+    if (ratio >= 1.15) return 'zpeed-heat-blaze';
+    if (ratio >= 0.75) return 'zpeed-heat-high';
+    if (ratio >= 0.35) return 'zpeed-heat-med';
+    return 'zpeed-heat-low';
+  }
+
+  function renderGuestTop3() {
+    const wrap = document.getElementById('zpeedGuestTop3');
+    if (!wrap) return;
+    const scores = {};
+    queue.forEach(t => {
+      const who = t.proposedBy || '?';
+      scores[who] = (scores[who] || 0) + Math.max(0, t.votes | 0);
+    });
+    const top = Object.entries(scores).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    if (!top.length) {
+      wrap.innerHTML = '';
+      return;
+    }
+    wrap.innerHTML =
+      '<div class="zpeed-top3">' +
+      top
+        .map(([n, s], i) => {
+          const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉';
+          const lab = n === guestName ? `${zpeedEscapeHtml(n)} · toi` : zpeedEscapeHtml(n);
+          return `<span class="zpeed-top3-pill">${medal} ${lab} · ${s}</span>`;
+        })
+        .join('') +
+      '</div>';
+  }
+
+  function applyGuestSocialClutch(oldSnap, newQueue) {
+    const th = roomMeta.voteThreshold != null ? Number(roomMeta.voteThreshold) : NaN;
+    const now = Date.now();
+    if (window.__zpeedStrongFxUntil && now < window.__zpeedStrongFxUntil) return;
+    newQueue.forEach(t => {
+      const p = oldSnap[t.id];
+      const st = t.status || 'pending';
+      const v = t.votes | 0;
+      const targets = [document.getElementById('vcard-' + t.id), document.getElementById('qrow-' + t.id)].filter(
+        Boolean
+      );
+      targets.forEach(el => {
+        const isVote = el.classList.contains('vote-card');
+        const clutchCls = isVote ? 'vote-card--clutch' : 'queue-item--clutch';
+        const valCls = isVote ? 'vote-card--validated-show' : 'queue-item--validated-show';
+        if (p && p.s === 'pending' && st === 'accepted') {
+          window.__zpeedStrongFxUntil = Date.now() + 700;
+          el.classList.add(clutchCls, valCls);
+          setTimeout(() => el.classList.remove(clutchCls, valCls), 2600);
+        } else if (!Number.isNaN(th) && p && st === 'pending' && p.v < th && v >= th) {
+          window.__zpeedStrongFxUntil = Date.now() + 700;
+          el.classList.add(clutchCls);
+          setTimeout(() => el.classList.remove(clutchCls), 850);
+        }
+      });
+    });
+  }
+
+  function spawnReactionOnTrackCard(trackId, emoji) {
+    const card = document.getElementById('vcard-' + trackId) || document.getElementById('qrow-' + trackId);
+    if (!card) return;
+    let layer = card.querySelector('.zpeed-react-layer');
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.className = 'zpeed-react-layer';
+      card.insertBefore(layer, card.firstChild);
+    }
+    const bubble = document.createElement('span');
+    bubble.className = 'zpeed-react-float';
+    bubble.textContent = emoji;
+    layer.appendChild(bubble);
+    setTimeout(() => bubble.remove(), 1200);
+  }
+
   function renderVoteList() {
     const el = document.getElementById('voteList');
     const votable = queue.filter(t => t.proposedBy !== guestName);
@@ -631,27 +793,42 @@
     }
 
     const maxVotes = Math.max(...votable.map(t => t.votes), 1);
+    const thNum = roomMeta.voteThreshold != null ? Number(roomMeta.voteThreshold) : NaN;
 
     el.innerHTML = votable.map(t => {
       const voted   = votedTracks.has(t.id);
-      const score   = t.votes;
+      const score   = t.votes | 0;
       const heat    = getHeatColor(score, maxVotes);
+      const thLbl = roomMeta.voteThreshold != null ? roomMeta.voteThreshold : '…';
+      const st =
+        t.status === 'accepted' ? ' · ✓ Validé' :
+        t.status === 'spotify_queued' ? ' · 🎵 File Spotify' :
+        (t.platform === 'spotify' || t.spotifyUri) ? ` · ⏳ Seuil ${thLbl} 👍` : '';
       const voters  = t.voterNames || [];
       const avatars = voters.slice(0, 5).map(n =>
         `<img class="voter-av" src="${avatarUrl(n, 40)}" alt="${n}" title="${n}" onerror="this.onerror=null;this.style.background='${stringToColor(n)}';">`
       ).join('');
       const moreVoters = voters.length > 5 ? `<div class="voter-av-more">+${voters.length - 5}</div>` : '';
+      const heatTier = !Number.isNaN(thNum) ? zpeedHeatTier(score, thNum) : 'zpeed-heat-low';
+      const momPct = !Number.isNaN(thNum) ? Math.min(100, Math.round((Math.max(0, score) / Math.max(thNum, 1)) * 100)) : 0;
+      const momRow =
+        !Number.isNaN(thNum)
+          ? `<div class="zpeed-momentum-row"><div class="zpeed-momentum"><div class="zpeed-momentum-fill" style="width:${momPct}%"></div></div><span class="zpeed-momentum-lbl">${Math.max(0, score)}/${thNum}</span></div>`
+          : '';
 
       return `
-        <div class="vote-card" id="vcard-${t.id}">
+        <div class="vote-card ${heatTier}" id="vcard-${t.id}">
+          <div class="zpeed-react-layer" id="zreact-${t.id}" aria-hidden="true"></div>
+          <span class="zpeed-validated-tag">${VALIDATION_LABEL}</span>
           <div style="display:flex;gap:10px;align-items:flex-start">
             <img src="${t.thumbnail||''}"
               onerror="this.onerror=null;this.src=THUMB_FALLBACK"
               style="width:52px;height:52px;border-radius:10px;object-fit:cover;flex-shrink:0">
             <div style="flex:1;min-width:0">
               <div class="vote-card-title">${t.title}</div>
-              <div class="vote-card-meta">${t.channel} · par ${t.proposedBy}</div>
+              <div class="vote-card-meta">${t.channel} · par ${t.proposedBy}${st}</div>
               ${voters.length ? `<div class="voter-avatars">${avatars}${moreVoters}</div>` : ''}
+              ${momRow}
               <div class="heat-bar">
                 <div class="heat-fill" style="width:${heat.pct}%;background:${heat.color};${heat.pulse?'animation:heatPulse 1s infinite':''}"></div>
               </div>
@@ -681,9 +858,37 @@
   // ─────────────────────────────────────────────
   // SOCKET EVENTS
   // ─────────────────────────────────────────────
-  socket.on('queue:update', ({ queue: q }) => {
+  function updateGuestRoomHint() {
+    const hint = document.getElementById('guestRoomHint');
+    if (!hint) return;
+    if (roomMeta.voteThreshold != null && roomMeta.totalUsers != null) {
+      hint.style.display = 'block';
+      hint.textContent = `${roomMeta.totalUsers} personne(s) dans la pièce · ${roomMeta.voteThreshold} 👍 pour envoyer sur Spotify`;
+    }
+  }
+
+  socket.on('room:state', (st) => {
+    roomMeta = { ...roomMeta, ...st };
+    updateGuestRoomHint();
+    renderVoteList();
+    renderQueue();
+  });
+
+  socket.on('queue:update', ({ queue: q, meta }) => {
+    const oldSnap = {};
+    queue.forEach(t => {
+      oldSnap[t.id] = { v: t.votes | 0, s: t.status || 'pending' };
+    });
     queue = q;
+    if (meta) roomMeta = { ...roomMeta, ...meta };
+    updateGuestRoomHint();
     renderQueue(); renderVoteList(); renderMyProposals();
+    renderGuestTop3();
+    requestAnimationFrame(() => applyGuestSocialClutch(oldSnap, q));
+    prevTrackSnap = {};
+    q.forEach(t => {
+      prevTrackSnap[t.id] = { v: t.votes | 0, s: t.status || 'pending' };
+    });
     const b = document.getElementById('badge-queue');
     if (q.length > 0) { b.textContent = q.length; b.classList.add('show'); }
     else b.classList.remove('show');
@@ -701,6 +906,11 @@
     // Faire pop l'avatar sur la card si elle est visible
     const card = document.getElementById(`vcard-${trackId}`);
     if (card) {
+      const sc = card.querySelector('.vote-score');
+      if (sc) {
+        sc.classList.add('zpeed-pop');
+        setTimeout(() => sc.classList.remove('zpeed-pop'), 300);
+      }
       const avContainer = card.querySelector('.voter-avatars');
       if (avContainer) {
         const bg  = stringToColor(voterName);
@@ -714,6 +924,7 @@
   });
 
   socket.on('track:reaction', ({ trackId, guestName: reactorName, emoji }) => {
+    spawnReactionOnTrackCard(trackId, emoji);
     // Afficher la pluie d'emojis — intensité selon qui réagit
     const count = reactorName === guestName ? 3 : 6;
     spawnLocalEmoji(emoji, count);
@@ -760,7 +971,14 @@
 
   function updateMiniPlayer(track) {
     const mp = document.getElementById('miniPlayer');
-    if (!track) { mp.classList.remove('visible'); return; }
+    if (!track) { mp.classList.remove('visible'); delete mp.dataset.playingId; return; }
+    const tid = String(track.id || '');
+    const prev = mp.dataset.playingId;
+    if (prev && prev !== tid) {
+      mp.classList.add('mini-player--track-swap');
+      setTimeout(() => mp.classList.remove('mini-player--track-swap'), 220);
+    }
+    mp.dataset.playingId = tid;
     mp.classList.add('visible');
     document.getElementById('miniThumb').src         = track.thumbnail || '';
     document.getElementById('miniTitle').textContent = track.title;
@@ -775,16 +993,34 @@
       el.innerHTML = `<div class="empty"><div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div><div class="empty-text">Aucun titre. Sois le premier !</div></div>`;
       return;
     }
+    const thLbl = roomMeta.voteThreshold != null ? roomMeta.voteThreshold : '…';
+    const thNum = roomMeta.voteThreshold != null ? Number(roomMeta.voteThreshold) : NaN;
     el.innerHTML = queue.map((t, i) => {
       const isOwn = t.proposedBy === guestName;
+      const stKey = t.status || 'pending';
+      const stClass = 'status-' + stKey;
+      const st =
+        t.status === 'accepted' ? '✓ Validé' :
+        t.status === 'spotify_queued' ? 'Spotify' :
+        t.status === 'pending' ? `Seuil ${thLbl}` : '';
+      const v = t.votes | 0;
+      const heatTier = !Number.isNaN(thNum) ? zpeedHeatTier(v, thNum) : 'zpeed-heat-low';
+      const momPct = !Number.isNaN(thNum) ? Math.min(100, Math.round((Math.max(0, v) / Math.max(thNum, 1)) * 100)) : 0;
+      const momRow =
+        !Number.isNaN(thNum)
+          ? `<div class="zpeed-momentum-row"><div class="zpeed-momentum"><div class="zpeed-momentum-fill" style="width:${momPct}%"></div></div><span class="zpeed-momentum-lbl">${Math.max(0, v)}/${thNum}</span></div>`
+          : '';
       return `
-        <div class="queue-item ${isOwn ? 'playing' : ''}">
-          <div style="font-family:'Roboto', sans-serif;font-size:1.1rem;font-weight:700;color:var(--text2);min-width:20px;text-align:center">${i+1}</div>
+        <div class="queue-item track-card ${isOwn ? 'playing' : ''} ${stClass} ${heatTier}" id="qrow-${t.id}" data-track-id="${t.id || ''}">
+          <div class="zpeed-react-layer" aria-hidden="true"></div>
+          <span class="zpeed-validated-tag">${VALIDATION_LABEL}</span>
+          <div style="font-family:'Roboto', sans-serif;font-size:1.1rem;font-weight:700;color:var(--text2);min-width:20px;text-align:center;align-self:flex-start;padding-top:2px">${i+1}</div>
           <img class="queue-thumb" src="${t.thumbnail}"
             onerror="this.onerror=null;this.src=THUMB_FALLBACK">
           <div class="queue-info">
             <div class="queue-title">${t.title}</div>
-            <div class="queue-meta">${t.channel}</div>
+            <div class="queue-meta">${t.channel}${st ? ` · <span style="color:var(--purple-light);font-weight:600">${st}</span>` : ''}</div>
+            ${momRow}
             <div class="queue-proposer">${isOwn ? '⭐ Toi' : '🎤 ' + t.proposedBy}</div>
           </div>
           <div class="vote-count" style="font-size:1rem">${t.votes > 0 ? '+'+t.votes : t.votes}</div>
@@ -867,8 +1103,46 @@
     .then(data => {
       queue = data.queue || [];
       renderQueue(); renderVoteList();
+      renderGuestTop3();
+      prevTrackSnap = {};
+      queue.forEach(t => {
+        prevTrackSnap[t.id] = { v: t.votes | 0, s: t.status || 'pending' };
+      });
       if (data.currentTrack) { renderNowPlaying(data.currentTrack); updateMiniPlayer(data.currentTrack); }
     });
+
+  (function initZpeedIdleNudge() {
+    let idleTimer;
+    const IDLE_MS = 12000;
+    function clearNudgeEls() {
+      document.body.classList.remove('zpeed-idle');
+      document.querySelectorAll('.zpeed-nudge-target').forEach(e => e.classList.remove('zpeed-nudge-target'));
+    }
+    function arm() {
+      clearTimeout(idleTimer);
+      clearNudgeEls();
+      idleTimer = setTimeout(() => {
+        document.body.classList.add('zpeed-idle');
+        const cards = [...document.querySelectorAll('#voteList .vote-card')];
+        const mostVoted = cards
+          .map(c => {
+            const id = c.id && c.id.replace(/^vcard-/, '');
+            const t = id ? queue.find(q => q.id === id) : null;
+            return { c, v: t ? (t.votes | 0) : -Infinity };
+          })
+          .sort((a, b) => b.v - a.v)[0];
+        if (mostVoted && Number.isFinite(mostVoted.v)) {
+          mostVoted.c.classList.add('zpeed-nudge-target');
+          return;
+        }
+        const si = document.getElementById('searchInput');
+        if (si) si.classList.add('zpeed-nudge-target');
+      }, IDLE_MS);
+    }
+    ['pointerdown', 'keydown', 'touchstart', 'scroll'].forEach(ev =>
+      window.addEventListener(ev, arm, { passive: true }));
+    arm();
+  })();
 </script>
 </body>
 </html>

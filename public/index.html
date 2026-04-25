@@ -116,7 +116,7 @@
   <script src="notif.js"></script>
 </head>
 <body>
-<div class="container">
+<div class="container container--onboard">
 
   <!-- no header on index — logo lives in hero section -->
 
@@ -138,7 +138,7 @@
              onkeydown="if(event.key==='Enter')goToStep2()">
     </div>
 
-    <button class="btn btn-primary" onclick="goToStep2()">
+    <button type="button" class="btn btn-primary btn-block" onclick="goToStep2()">
       Continuer →
     </button>
   </div>
@@ -159,6 +159,11 @@
       <div class="role-desc">Tu deviens HOST · Tu gères la queue<br>et l'enceinte depuis ton téléphone</div>
     </div>
 
+    <div style="width:100%;max-width:340px;margin:0 auto 14px;padding:12px 14px;border-radius:14px;border:1px solid rgba(30,215,96,0.22);background:rgba(30,215,96,0.06);font-size:0.78rem;color:var(--text2);line-height:1.45">
+      <strong style="color:#1ED760">Spotify requis</strong> pour créer une soirée. Connecte-toi une fois, puis crée ta session.
+      <button type="button" class="btn btn-spotify btn-block" style="margin-top:10px" onclick="connectSpotifyPrecreate()">🎵 Connecter Spotify</button>
+    </div>
+
     <div class="divider">ou</div>
 
     <!-- Rejoindre -->
@@ -174,7 +179,7 @@
       </div>
     </div>
 
-    <button class="btn btn-secondary" onclick="goToStep1()">← Retour</button>
+    <button type="button" class="btn btn-secondary btn-block" onclick="goToStep1()">← Retour</button>
   </div>
 
   <!-- ─── STEP 3 : CONFIRMATION ─── -->
@@ -182,10 +187,10 @@
     <div style="text-align:center;padding:20px 0" id="confirmContent">
       <!-- rempli par JS -->
     </div>
-    <button class="btn btn-primary" id="enterBtn" onclick="enterApp()">
+    <button type="button" class="btn btn-primary btn-block" id="enterBtn" onclick="enterApp()">
       Entrer dans la session →
     </button>
-    <button class="btn btn-secondary" onclick="goToStep2()">← Retour</button>
+    <button type="button" class="btn btn-secondary btn-block" onclick="goToStep2()">← Retour</button>
   </div>
 
 </div>
@@ -267,6 +272,18 @@
   }
   document.addEventListener('DOMContentLoaded', initCodeBoxes);
 
+  document.addEventListener('DOMContentLoaded', () => {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get('spotify_ready') === '1') {
+      showToast('✅ Spotify connecté ! Tu peux créer ta soirée.');
+      history.replaceState({}, '', 'index.html');
+    }
+  });
+
+  function connectSpotifyPrecreate() {
+    window.location.href = '/auth/spotify?sessionCode=__precreate__';
+  }
+
   function setStep(id) {
     document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
@@ -279,9 +296,15 @@
       const res = await fetch('/api/session/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({ hostName: userName })
       });
       const data = await res.json();
+      if (res.status === 403 && data.needSpotify) {
+        showToast('🎵 Connecte Spotify d’abord');
+        connectSpotifyPrecreate();
+        return;
+      }
       if (!data.success) { showToast('❌ Erreur serveur'); return; }
 
       sessionData = { role: 'host', ...data };
@@ -289,6 +312,7 @@
       localStorage.setItem('zpeed_code',       data.code);
       localStorage.setItem('zpeed_role',       'host');
       localStorage.setItem('zpeed_hostId',     data.hostId);
+      localStorage.setItem('zpeed_hostSecret', data.hostSecret);
       localStorage.setItem('zpeed_hostName',   userName);
       localStorage.setItem('zpeed_userName',   userName);
       localStorage.setItem('zpeed_qr',         data.qrDataUrl);

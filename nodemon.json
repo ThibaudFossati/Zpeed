@@ -1,0 +1,11 @@
+{
+  "watch": ["server.js", "public"],
+  "ignore": [
+    "sessions.json",
+    "*.log",
+    ".env",
+    "node_modules"
+  ],
+  "ext": "js,html,css",
+  "delay": "500"
+}

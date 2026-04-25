@@ -13,6 +13,62 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
+const { ensureSpotifyAccessToken } = require('./lib/spotifySession');
+const {
+  addHostSocket,
+  removeHostSocket,
+  addGuestSocket,
+  removeGuestSocket
+} = require('./lib/roomPresence');
+const { tryAcceptSpotifyTracks, sortQueueForUi, metaForRoom } = require('./lib/queueAccept');
+const { tickSpotifyPipeline, initSpotifyPipelineState } = require('./lib/spotifyPipeline');
+
+const SPOTIFY_PRECREATE_STATE = '__precreate__';
+
+function maskSpotifyToken(token) {
+  if (!token || typeof token !== 'string') return 'none';
+  if (token.length <= 10) return `${token.slice(0, 2)}***`;
+  return `${token.slice(0, 6)}...${token.slice(-4)}`;
+}
+
+function spotifyDiag(label, payload = {}) {
+  const out = { ...payload };
+  if (out.accessToken) out.accessToken = maskSpotifyToken(out.accessToken);
+  if (out.refreshToken) out.refreshToken = maskSpotifyToken(out.refreshToken);
+  console.log(`[SPOTIFY_DIAG] ${label}`, out);
+}
+
+function spotifyApiFailure(res, status, stage, details = {}) {
+  const code =
+    status === 401
+      ? 'spotify_unauthorized'
+      : status === 403
+      ? 'spotify_forbidden'
+      : 'spotify_api_error';
+  const message =
+    status === 401
+      ? 'Spotify token expired or invalid. Reconnect Spotify.'
+      : status === 403
+      ? 'Spotify access denied. Check app access/allowlist/scopes.'
+      : 'Spotify request failed.';
+  return res.status(status || 502).json({ error: code, stage, message, details });
+}
+
+function hydrateSession(s) {
+  if (!s.queue) s.queue = [];
+  for (const t of s.queue) {
+    if (!t.status) t.status = 'pending';
+    if (!t.proposedAt) t.proposedAt = (s.createdAt && new Date(s.createdAt).toISOString()) || new Date().toISOString();
+  }
+  initSpotifyPipelineState(s);
+  if (!s.spotifyOutbox) s.spotifyOutbox = [];
+  if (!Array.isArray(s.guests)) s.guests = [];
+  if (typeof s.hostSecret !== 'string') s.hostSecret = uuidv4();
+}
+
+function isHostSocketAuthorized(socket, code) {
+  return socket.role === 'host' && socket.sessionCode === code && socket.hostAuthorized === true;
+}
 
 // ─────────────────────────────────────────────
 // AI — CLAUDE (DJ comment + roast)
@@ -243,10 +299,35 @@ const spotifyApi = new SpotifyWebApi({
   clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
   redirectUri:  SPOTIFY_REDIRECT
 });
+const USE_MOCK_SPOTIFY = process.env.USE_MOCK_SPOTIFY === 'true';
+const SPOTIFY_SCOPES = [
+  'user-read-private',
+  'user-read-email',
+  'playlist-read-private',
+  'playlist-read-collaborative',
+  'streaming',
+  'user-modify-playback-state',
+  'user-read-playback-state'
+];
+
+app.get('/api/spotify/oauth-debug', (req, res) => {
+  res.json({
+    redirectUri: SPOTIFY_REDIRECT,
+    scopes: SPOTIFY_SCOPES,
+    hasClientId: !!process.env.SPOTIFY_CLIENT_ID,
+    hasClientSecret: !!process.env.SPOTIFY_CLIENT_SECRET,
+    note: 'Allowlist/app mode must be verified in Spotify Developer Dashboard (Users and Access).'
+  });
+});
 
 app.get('/auth/spotify', (req, res) => {
   const { sessionCode } = req.query;
-  const scopes = ['user-read-private', 'user-read-email', 'playlist-read-private', 'playlist-read-collaborative', 'streaming', 'user-modify-playback-state', 'user-read-playback-state'];
+  const scopes = SPOTIFY_SCOPES;
+  spotifyDiag('oauth_authorize_redirect', {
+    sessionCode: sessionCode || null,
+    redirectUri: SPOTIFY_REDIRECT,
+    scopes
+  });
   const url = spotifyApi.createAuthorizeURL(scopes, sessionCode || '');
   res.redirect(url);
 });
@@ -272,23 +353,57 @@ app.get('/auth/spotify/callback', async (req, res) => {
       }
     );
     console.log('Spotify token exchange SUCCESS:', tokenRes.status);
-    const { access_token, refresh_token } = tokenRes.data;
+    const { access_token, refresh_token, token_type, scope, expires_in } = tokenRes.data;
+    spotifyDiag('oauth_token_exchange', {
+      status: tokenRes.status,
+      state: state || null,
+      redirectUri: SPOTIFY_REDIRECT,
+      tokenType: token_type || null,
+      scope: scope || null,
+      expiresIn: expires_in || null,
+      accessToken: access_token,
+      refreshToken: refresh_token
+    });
 
     // ── Step 2: Fetch user profile (use a fresh per-request instance to avoid race conditions) ──
     let profile = { name: 'Spotify', picture: null, email: null };
     try {
       const meRes = await axios.get('https://api.spotify.com/v1/me', {
-        headers: { Authorization: `Bearer ${access_token}` }
+        headers: { Authorization: `Bearer ${access_token}` },
+        validateStatus: () => true
       });
-      const me = meRes.data;
-      profile = {
-        name:    me.display_name || me.id || 'Spotify',
-        picture: me.images?.[0]?.url || null,
-        email:   me.email || null
-      };
-      console.log('Spotify profile fetched:', profile.name);
+      if (meRes.status === 200) {
+        const me = meRes.data;
+        profile = {
+          name: me.display_name || me.id || 'Spotify',
+          picture: me.images?.[0]?.url || null,
+          email: me.email || null
+        };
+        console.log('Spotify profile fetched:', profile.name);
+      } else {
+        spotifyDiag('oauth_getme_non200', {
+          status: meRes.status,
+          state: state || null,
+          tokenType: token_type || null,
+          grantedScope: scope || null,
+          redirectUri: SPOTIFY_REDIRECT,
+          responseError: meRes.data?.error || meRes.data || null
+        });
+      }
     } catch (profileErr) {
-      console.warn('Spotify getMe failed (non-fatal):', profileErr.response?.data?.error?.message || profileErr.message);
+      spotifyDiag('oauth_getme_exception', {
+        state: state || null,
+        tokenType: token_type || null,
+        grantedScope: scope || null,
+        redirectUri: SPOTIFY_REDIRECT,
+        error: profileErr.response?.data || profileErr.message
+      });
+    }
+
+    // ── Pré-connexion (avant création de room) ─────────────────────────────────
+    if (state === SPOTIFY_PRECREATE_STATE) {
+      req.session.pendingHostSpotify = { tokens: { access_token, refresh_token }, profile };
+      return res.redirect('/index.html?spotify_ready=1');
     }
 
     // ── Step 3: Store in session if it exists ─────────────────────────────────
@@ -310,16 +425,20 @@ app.get('/auth/spotify/callback', async (req, res) => {
   }
 });
 
-// ── Return stored Spotify token to client (used after OAuth redirect) ──
+// ── Return stored Spotify token to host client (Web Playback SDK) — requires hostSecret ──
 app.get('/api/spotify/token', (req, res) => {
-  const { code } = req.query;
+  const { code, secret } = req.query;
   const s = sessions[code];
+  if (!secret || s?.hostSecret !== secret) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
   if (!s?.hostSpotify?.tokens?.access_token) {
     return res.status(404).json({ error: 'No Spotify token for this session' });
   }
   res.json({
     access_token: s.hostSpotify.tokens.access_token,
-    profile: s.hostSpotify.profile || null
+    profile: s.hostSpotify.profile || null,
+    use_mock_spotify: USE_MOCK_SPOTIFY
   });
 });
 
@@ -327,34 +446,65 @@ app.get('/api/spotify/playlists', async (req, res) => {
   const { code } = req.query;
   const s = sessions[code];
   if (!s?.hostSpotify?.tokens) return res.status(401).json({ error: 'Not connected' });
+  const ensure = await ensureSpotifyAccessToken(s, process.env);
+  if (!ensure.ok) {
+    spotifyDiag('spotify_playlists_token_invalid', { code, error: ensure.error });
+    return spotifyApiFailure(res, 401, 'playlists.ensure_token');
+  }
   spotifyApi.setAccessToken(s.hostSpotify.tokens.access_token);
-  const data = await spotifyApi.getUserPlaylists({ limit: 20 });
-  res.json(data.body.items.map(p => ({
-    id: p.id, title: p.name,
-    thumbnail: p.images?.[0]?.url,
-    count: p.tracks?.total
-  })));
+  try {
+    const data = await spotifyApi.getUserPlaylists({ limit: 20 });
+    res.json(data.body.items.map(p => ({
+      id: p.id, title: p.name,
+      thumbnail: p.images?.[0]?.url,
+      count: p.tracks?.total
+    })));
+  } catch (e) {
+    const status = e.statusCode || e.status || e.response?.statusCode || 502;
+    spotifyDiag('spotify_playlists_failed', {
+      code,
+      status,
+      error: e.body || e.message
+    });
+    return spotifyApiFailure(res, status, 'playlists.fetch');
+  }
 });
 
 app.get('/api/spotify/playlist/:id', async (req, res) => {
   const { code } = req.query;
   const s = sessions[code];
   if (!s?.hostSpotify?.tokens) return res.status(401).json({ error: 'Not connected' });
+  const ensure = await ensureSpotifyAccessToken(s, process.env);
+  if (!ensure.ok) {
+    spotifyDiag('spotify_playlist_tracks_token_invalid', { code, playlistId: req.params.id, error: ensure.error });
+    return spotifyApiFailure(res, 401, 'playlist_tracks.ensure_token');
+  }
   spotifyApi.setAccessToken(s.hostSpotify.tokens.access_token);
-  const data = await spotifyApi.getPlaylistTracks(req.params.id, { limit: 50 });
-  const tracks = data.body.items
-    .filter(i => i.track)
-    .map(i => ({
-      videoId:   null,
-      spotifyId: i.track.id,
-      title:     i.track.name,
-      channel:   i.track.artists.map(a => a.name).join(', '),
-      thumbnail: i.track.album?.images?.[0]?.url,
-      preview:   i.track.preview_url,
-      platform:  'spotify',
-      duration:  Math.floor(i.track.duration_ms / 1000) + 's'
-    }));
-  res.json(tracks);
+  try {
+    const data = await spotifyApi.getPlaylistTracks(req.params.id, { limit: 50 });
+    const tracks = data.body.items
+      .filter(i => i.track)
+      .map(i => ({
+        videoId:   null,
+        spotifyId: i.track.id,
+        title:     i.track.name,
+        channel:   i.track.artists.map(a => a.name).join(', '),
+        thumbnail: i.track.album?.images?.[0]?.url,
+        preview:   i.track.preview_url,
+        platform:  'spotify',
+        duration:  Math.floor(i.track.duration_ms / 1000) + 's'
+      }));
+    res.json(tracks);
+  } catch (e) {
+    const status = e.statusCode || e.status || e.response?.statusCode || 502;
+    spotifyDiag('spotify_playlist_tracks_failed', {
+      code,
+      playlistId: req.params.id,
+      status,
+      error: e.body || e.message
+    });
+    return spotifyApiFailure(res, status, 'playlist_tracks.fetch');
+  }
 });
 
 // ─────────────────────────────────────────────
@@ -474,7 +624,9 @@ function loadSessions() {
       const cutoff = Date.now() - 12 * 60 * 60 * 1000;
       for (const [code, s] of Object.entries(saved)) {
         if (new Date(s.createdAt).getTime() > cutoff) {
+          delete s._presence;
           sessions[code] = s;
+          hydrateSession(sessions[code]);
         }
       }
       console.log(`📂 Loaded ${Object.keys(sessions).length} active session(s) from disk`);
@@ -486,7 +638,12 @@ function loadSessions() {
 
 function saveSessions() {
   try {
-    fs.writeFileSync(SESSIONS_FILE, JSON.stringify(sessions, null, 2));
+    const out = {};
+    for (const [code, s] of Object.entries(sessions)) {
+      const { _presence, ...rest } = s;
+      out[code] = rest;
+    }
+    fs.writeFileSync(SESSIONS_FILE, JSON.stringify(out, null, 2));
   } catch (e) {
     console.warn('Could not save sessions.json:', e.message);
   }
@@ -532,11 +689,23 @@ app.post('/api/speaker/connect', async (req, res) => {
   }
 
   // ── HOST : premier connecté à cette enceinte ──
+  const pending = req.session?.pendingHostSpotify;
+  if (!pending?.tokens?.access_token) {
+    return res.status(403).json({
+      success: false,
+      needSpotify: true,
+      message: 'Connecte Spotify avant de créer une session.'
+    });
+  }
+
   const code = Math.random().toString(36).substring(2, 6).toUpperCase();
   const hostId = uuidv4();
+  const hostSecret = uuidv4();
 
   sessions[code] = {
-    code, hostId,
+    code,
+    hostId,
+    hostSecret,
     hostName: userName || 'Host',
     speakerName,
     speakerId: key,
@@ -545,8 +714,15 @@ app.post('/api/speaker/connect', async (req, res) => {
     currentTrack: null,
     guests: [],
     hostGoogle: null,
+    hostSpotify: { tokens: { ...pending.tokens }, profile: pending.profile || { name: 'Spotify' } },
+    spotifyOutbox: [],
+    spotifyDeviceId: null,
+    playerLost: false,
     createdAt: new Date()
   };
+  hydrateSession(sessions[code]);
+  delete req.session.pendingHostSpotify;
+  saveSessions();
 
   // Lier l'enceinte à cette session
   speakerSessions[key] = code;
@@ -561,6 +737,7 @@ app.post('/api/speaker/connect', async (req, res) => {
     role: 'host',
     code,
     hostId,
+    hostSecret,
     qrDataUrl,
     speakerName,
     message: `Tu es le HOST de cette session`
@@ -576,20 +753,38 @@ app.post('/api/speaker/disconnect', (req, res) => {
 });
 
 app.post('/api/session/create', async (req, res) => {
+  const pending = req.session?.pendingHostSpotify;
+  if (!pending?.tokens?.access_token) {
+    return res.status(403).json({
+      success: false,
+      needSpotify: true,
+      message: 'Connecte Spotify avant de créer une soirée.'
+    });
+  }
+
   const { hostName } = req.body;
   const code = Math.random().toString(36).substring(2, 6).toUpperCase();
   const hostId = uuidv4();
+  const hostSecret = uuidv4();
 
   sessions[code] = {
-    code, hostId,
+    code,
+    hostId,
+    hostSecret,
     hostName: hostName || 'Host',
     guestCount: 0,
     queue: [],
     currentTrack: null,
     guests: [],
     hostGoogle: null,
+    hostSpotify: { tokens: { ...pending.tokens }, profile: pending.profile || { name: 'Spotify' } },
+    spotifyOutbox: [],
+    spotifyDeviceId: null,
+    playerLost: false,
     createdAt: new Date()
   };
+  hydrateSession(sessions[code]);
+  delete req.session.pendingHostSpotify;
   saveSessions();
 
   const joinUrl = `${PUBLIC_BASE}/?code=${code}`;
@@ -602,13 +797,16 @@ app.post('/api/session/create', async (req, res) => {
   const qrMatrix = Array.from(qrObj.modules.data);
   const qrSize   = qrObj.modules.size;
 
-  res.json({ success: true, code, hostId, qrDataUrl, joinUrl, lanIP: LAN_IP, qrMatrix, qrSize });
+  res.json({ success: true, code, hostId, hostSecret, qrDataUrl, joinUrl, lanIP: LAN_IP, qrMatrix, qrSize });
 });
 
 app.post('/api/session/join', (req, res) => {
   const { code, guestName } = req.body;
   const session = sessions[code];
   if (!session) return res.status(404).json({ success: false, message: 'Session introuvable' });
+  if (!session.hostSpotify?.tokens?.access_token) {
+    return res.status(403).json({ success: false, message: 'Cette session n\'accepte pas encore de guests.' });
+  }
 
   const guestId = uuidv4();
   session.guests.push({ id: guestId, name: guestName || 'Guest' });
@@ -631,9 +829,11 @@ app.get('/api/session/:code', (req, res) => {
     code: session.code,
     hostName: session.hostName,
     guestCount: session.guestCount,
+    guestList: session.guests,
     queue: session.queue,
     currentTrack: session.currentTrack,
-    googleConnected: !!(session.hostGoogle)
+    googleConnected: !!(session.hostGoogle),
+    meta: metaForRoom(session)
   });
 });
 
@@ -659,64 +859,118 @@ app.get('/api/search', async (req, res) => {
 // SOCKET.IO
 // ─────────────────────────────────────────────
 io.on('connection', (socket) => {
+  const voterKeyForSocket = (s, sock) => {
+    if (sock.role === 'host' && s?.hostId) return `host:${s.hostId}`;
+    if (sock.role === 'guest' && sock.guestId) return sock.guestId;
+    return null;
+  };
 
-  socket.on('host:join', ({ code, hostId }) => {
-    if (!sessions[code]) return;
+  socket.on('host:join', ({ code, hostId, hostSecret }) => {
+    const s = sessions[code];
+    if (!s || s.hostId !== hostId || s.hostSecret !== hostSecret) return;
     socket.join(`session:${code}`);
     socket.sessionCode = code;
     socket.role = 'host';
+    socket.hostAuthorized = true;
+    addHostSocket(s, socket.id);
+    saveSessions();
+    io.to(`session:${code}`).emit('session:update', {
+      guestCount: s.guestCount,
+      guestList: s.guests,
+      queue: s.queue,
+      meta: metaForRoom(s)
+    });
+    io.to(`session:${code}`).emit('room:state', { code, ...metaForRoom(s) });
+  });
+
+  socket.on('host:spotify_device', ({ code, hostSecret, deviceId }) => {
+    const s = sessions[code];
+    if (!s || s.hostSecret !== hostSecret) return;
+    if (deviceId) {
+      s.spotifyDeviceId = deviceId;
+      s.playerLost = false;
+    }
+    saveSessions();
+    io.to(`session:${code}`).emit('room:state', { code, ...metaForRoom(s) });
+    tickSpotifyPipeline({ session: s, code, io, processEnv: process.env, saveSessions }).catch(() => {});
+  });
+
+  socket.on('host:playback_lost', ({ code, hostSecret }) => {
+    const s = sessions[code];
+    if (!s || s.hostSecret !== hostSecret) return;
+    s.playerLost = true;
+    saveSessions();
+    io.to(`session:${code}`).emit('room:state', {
+      code,
+      spotifyNeedsDevice: !s.spotifyDeviceId,
+      playerLost: true
+    });
   });
 
   socket.on('guest:join', ({ code, guestId, guestName }) => {
-    if (!sessions[code]) return;
+    const s = sessions[code];
+    if (!s) return;
     socket.join(`session:${code}`);
     socket.sessionCode = code;
     socket.role = 'guest';
     socket.guestId = guestId;
     socket.guestName = guestName;
-    // Needed for targeted AI roast delivery
     socket.data.guestId = guestId;
     socket.data.code = code;
+    addGuestSocket(s, guestId, socket.id);
 
     io.to(`session:${code}`).emit('session:update', {
-      guestCount: sessions[code].guestCount,
-      guestList:  sessions[code].guests,
-      queue: sessions[code].queue
+      guestCount: s.guestCount,
+      guestList: s.guests,
+      queue: s.queue,
+      meta: metaForRoom(s)
     });
-
+    io.to(`session:${code}`).emit('room:state', { code, ...metaForRoom(s) });
     io.to(`session:${code}`).emit('notification', {
       message: `🎉 ${guestName} a rejoint la session !`
     });
+    tryAcceptSpotifyTracks(s, io, code, saveSessions);
   });
 
-  socket.on('track:propose', ({ code, guestId, guestName, userName, track }) => {
+  socket.on('track:propose', ({ code, guestId, hostId, guestName, userName, track }) => {
     const s = sessions[code];
     if (!s) return;
     const name = guestName || userName || 'Anonyme';
+    const proposerKey =
+      guestId || (hostId && s.hostId === hostId ? `host:${s.hostId}` : `anon:${socket.id}`);
     const trackId = uuidv4();
-    const newTrack = { id: trackId, ...track, votes: 1, proposedBy: name, voters: [guestId || 'host'] };
+    const newTrack = {
+      id: trackId,
+      ...track,
+      votes: 1,
+      proposedBy: name,
+      voters: [proposerKey],
+      voterNames: [name],
+      status: 'pending',
+      proposedAt: new Date().toISOString(),
+      platform: track.platform || (track.spotifyUri || track.spotifyId ? 'spotify' : 'youtube')
+    };
     s.queue.push(newTrack);
-    s.queue.sort((a, b) => b.votes - a.votes);
+    sortQueueForUi(s);
     saveSessions();
-    io.to(`session:${code}`).emit('queue:update', { queue: s.queue });
+    io.to(`session:${code}`).emit('queue:update', { queue: s.queue, meta: metaForRoom(s) });
     io.to(`session:${code}`).emit('notification', { message: `🎵 ${name} a proposé "${track.title}"` });
-    // 🔥 Roast — si 0 vote après 45 secondes (en dehors du vote auto du proposeur)
+    tryAcceptSpotifyTracks(s, io, code, saveSessions);
+    tickSpotifyPipeline({ session: s, code, io, processEnv: process.env, saveSessions }).catch(() => {});
+
     setTimeout(() => {
       const sess = sessions[code];
       if (!sess) return;
       const t = sess.queue.find(q => q.id === trackId);
-      // votes = 1 = seulement le proposeur lui-même, personne d'autre n'a voté
       if (t && t.votes <= 1) {
-        aiRoast(name, track.title, track.artist).then(roast => {
+        aiRoast(name, track.title, track.artist || track.channel).then(roast => {
           if (roast) {
-            // Envoyer au socket du proposeur (ou broadcast si pas trouvé)
             const targetSocket = [...io.sockets.sockets.values()].find(
               sk => sk.data && sk.data.guestId === guestId && sk.data.code === code
             );
             if (targetSocket) {
               targetSocket.emit('ai:roast', { roast, trackId });
             } else {
-              // Fallback: broadcast à la session avec guestId pour filtrage côté client
               io.to(`session:${code}`).emit('ai:roast', { roast, trackId, guestId });
             }
           }
@@ -725,20 +979,24 @@ io.on('connection', (socket) => {
     }, 45 * 1000);
   });
 
-  socket.on('track:vote', ({ code, trackId, guestId, guestName, userName, vote }) => {
+  socket.on('track:vote', ({ code, trackId, guestId, guestName, userName, vote, hostId }) => {
     const s = sessions[code];
     if (!s) return;
+    const voterKey =
+      guestId ||
+      (hostId && s.hostId === hostId ? `host:${s.hostId}` : null) ||
+      voterKeyForSocket(s, socket);
+    if (!voterKey) return;
     const track = s.queue.find(t => t.id === trackId);
-    if (!track || track.voters.includes(guestId)) return;
+    if (!track || track.voters.includes(voterKey)) return;
     track.votes += vote;
-    track.voters.push(guestId);
-    // Stocker noms des votants pour les avatars
+    track.voters.push(voterKey);
     if (!track.voterNames) track.voterNames = [];
     const name = guestName || userName || 'Someone';
     if (!track.voterNames.includes(name)) track.voterNames.push(name);
-    s.queue.sort((a, b) => b.votes - a.votes);
-    io.to(`session:${code}`).emit('queue:update', { queue: s.queue });
-    // Broadcaster l'event vote aux autres users (connivence)
+    sortQueueForUi(s);
+    tryAcceptSpotifyTracks(s, io, code, saveSessions);
+    io.to(`session:${code}`).emit('queue:update', { queue: s.queue, meta: metaForRoom(s) });
     if (vote > 0) {
       io.to(`session:${code}`).emit('track:voted', {
         trackId,
@@ -747,6 +1005,7 @@ io.on('connection', (socket) => {
         votes: track.votes
       });
     }
+    tickSpotifyPipeline({ session: s, code, io, processEnv: process.env, saveSessions }).catch(() => {});
   });
 
   socket.on('track:react', ({ code, trackId, guestId, guestName, emoji }) => {
@@ -762,36 +1021,40 @@ io.on('connection', (socket) => {
   });
 
   socket.on('track:play', ({ code, trackId }) => {
+    if (!isHostSocketAuthorized(socket, code)) return;
     const s = sessions[code];
     if (!s) return;
     const track = s.queue.find(t => t.id === trackId);
     if (!track) return;
     s.currentTrack = track;
     s.queue = s.queue.filter(t => t.id !== trackId);
-    io.to(`session:${code}`).emit('track:playing', { track });
-    io.to(`session:${code}`).emit('queue:update', { queue: s.queue });
-    // 🎤 AI DJ — commentaire async
-    aiDJComment(track.title, track.artist).then(comment => {
+    io.to(`session:${code}`).emit('track:playing', { track, fromServer: false });
+    io.to(`session:${code}`).emit('queue:update', { queue: s.queue, meta: metaForRoom(s) });
+    aiDJComment(track.title, track.artist || track.channel).then(comment => {
       if (comment) io.to(`session:${code}`).emit('ai:dj_comment', { comment, track });
     });
+    saveSessions();
   });
 
   socket.on('track:skip', ({ code }) => {
+    if (!isHostSocketAuthorized(socket, code)) return;
     const s = sessions[code];
     if (!s) return;
     if (s.queue.length > 0) {
       const next = s.queue.shift();
       s.currentTrack = next;
-      io.to(`session:${code}`).emit('track:playing', { track: next });
-      io.to(`session:${code}`).emit('queue:update', { queue: s.queue });
+      io.to(`session:${code}`).emit('track:playing', { track: next, fromServer: false });
+      io.to(`session:${code}`).emit('queue:update', { queue: s.queue, meta: metaForRoom(s) });
     } else {
       s.currentTrack = null;
-      io.to(`session:${code}`).emit('track:playing', { track: null });
+      io.to(`session:${code}`).emit('track:playing', { track: null, fromServer: false });
+      io.to(`session:${code}`).emit('queue:update', { queue: s.queue, meta: metaForRoom(s) });
     }
+    saveSessions();
   });
 
-  // Host ends the session
   socket.on('session:end', ({ code }) => {
+    if (!isHostSocketAuthorized(socket, code)) return;
     const s = sessions[code];
     if (!s) return;
     io.to(`session:${code}`).emit('session:ended', {});
@@ -799,14 +1062,42 @@ io.on('connection', (socket) => {
     saveSessions();
   });
 
-  // Host adds a track from their playlist directly
   socket.on('track:add_from_playlist', ({ code, track }) => {
+    if (!isHostSocketAuthorized(socket, code)) return;
     const s = sessions[code];
     if (!s) return;
-    const newTrack = { id: uuidv4(), ...track, votes: 0, proposedBy: '🎧 Host', voters: [] };
+    const newTrack = {
+      id: uuidv4(),
+      ...track,
+      votes: 0,
+      proposedBy: '🎧 Host',
+      voters: [],
+      voterNames: [],
+      status: 'pending',
+      proposedAt: new Date().toISOString(),
+      platform: track.platform || (track.spotifyUri || track.spotifyId ? 'spotify' : 'youtube')
+    };
     s.queue.push(newTrack);
-    io.to(`session:${code}`).emit('queue:update', { queue: s.queue });
+    sortQueueForUi(s);
+    saveSessions();
+    io.to(`session:${code}`).emit('queue:update', { queue: s.queue, meta: metaForRoom(s) });
     io.to(`session:${code}`).emit('notification', { message: `🎧 Host a ajouté "${track.title}"` });
+    tryAcceptSpotifyTracks(s, io, code, saveSessions);
+    tickSpotifyPipeline({ session: s, code, io, processEnv: process.env, saveSessions }).catch(() => {});
+  });
+
+  socket.on('disconnect', () => {
+    const code = socket.sessionCode;
+    if (!code || !sessions[code]) return;
+    const s = sessions[code];
+    if (socket.role === 'host') {
+      removeHostSocket(s, socket.id);
+    } else if (socket.role === 'guest' && socket.guestId) {
+      removeGuestSocket(s, socket.guestId, socket.id);
+    }
+    tryAcceptSpotifyTracks(s, io, code, saveSessions);
+    io.to(`session:${code}`).emit('room:state', { code, ...metaForRoom(s) });
+    saveSessions();
   });
 });
 
@@ -825,27 +1116,147 @@ app.post('/api/spotify/store-token', (req, res) => {
   res.json({ ok: true });
 });
 
+function getDevMockSpotifyItems(rawQuery) {
+  const q = String(rawQuery || '').toLowerCase().trim();
+  const baseByArtist = {
+    daft: [
+      { title: 'One More Time', channel: 'Daft Punk' },
+      { title: 'Get Lucky', channel: 'Daft Punk, Pharrell Williams' },
+      { title: 'Harder, Better, Faster, Stronger', channel: 'Daft Punk' }
+    ],
+    weeknd: [
+      { title: 'Blinding Lights', channel: 'The Weeknd' },
+      { title: 'Starboy', channel: 'The Weeknd, Daft Punk' },
+      { title: 'Save Your Tears', channel: 'The Weeknd' }
+    ],
+    drake: [
+      { title: "God's Plan", channel: 'Drake' },
+      { title: 'Hotline Bling', channel: 'Drake' },
+      { title: 'One Dance', channel: 'Drake, Wizkid, Kyla' }
+    ],
+    miley: [
+      { title: 'Flowers', channel: 'Miley Cyrus' },
+      { title: 'Wrecking Ball', channel: 'Miley Cyrus' },
+      { title: "Party In The U.S.A.", channel: 'Miley Cyrus' }
+    ],
+    'bad bunny': [
+      { title: 'Tití Me Preguntó', channel: 'Bad Bunny' },
+      { title: 'MONACO', channel: 'Bad Bunny' },
+      { title: 'Moscow Mule', channel: 'Bad Bunny' }
+    ]
+  };
+  const key = Object.keys(baseByArtist).find(k => q.includes(k));
+  const picked = key ? baseByArtist[key] : [
+    { title: 'Midnight City', channel: 'M83' },
+    { title: 'Feel Good Inc.', channel: 'Gorillaz' },
+    { title: 'Levitating', channel: 'Dua Lipa' }
+  ];
+  return picked.slice(0, 8).map((t, i) => ({
+    id: `devmock_${(key || 'generic').replace(/\s+/g, '_')}_${i + 1}`,
+    name: t.title,
+    artists: [{ name: t.channel }],
+    album: {
+      images: [
+        { url: `https://picsum.photos/seed/zpeed_sp_mock_${encodeURIComponent((key || 'generic') + '_' + i)}/640/640` }
+      ]
+    },
+    uri: `spotify:track:devmock_${(key || 'generic').replace(/\s+/g, '_')}_${i + 1}`,
+    isMock: true,
+    duration_ms: (180 + i * 17) * 1000
+  }));
+}
+
+function mapSpotifyItemsToTrackResults(items) {
+  return items.map(t => ({
+    platform: 'spotify',
+    spotifyUri: t.uri,
+    spotifyId: t.id,
+    title: t.name,
+    channel: Array.isArray(t.artists) ? t.artists.map(a => a.name).join(', ') : '',
+    thumbnail: t.album?.images?.[1]?.url || t.album?.images?.[0]?.url || '',
+    duration: `${Math.floor((t.duration_ms || 0) / 1000)}s`,
+    isMock: !!t.isMock
+  }));
+}
+
 // ─── Spotify search (uses HOST's token, called by guests) ───
 app.get('/api/spotify/search', async (req, res) => {
   const { q, code } = req.query;
+  if (USE_MOCK_SPOTIFY) {
+    console.log('[MOCK_SPOTIFY] Using fallback search (env)');
+    return res.json(mapSpotifyItemsToTrackResults(getDevMockSpotifyItems(q)));
+  }
   const s = sessions[code];
   if (!s?.hostSpotify?.tokens) return res.status(401).json({ error: 'Not connected' });
+  const ensure = await ensureSpotifyAccessToken(s, process.env);
+  if (!ensure.ok) {
+    spotifyDiag('spotify_search_token_invalid', {
+      code,
+      query: q || '',
+      status: ensure.status || 401,
+      error: ensure.error,
+      details: ensure.details || null
+    });
+    return spotifyApiFailure(res, ensure.status || 401, 'search.ensure_token', ensure.details || {});
+  }
   try {
+    const query = String(q || '');
+    const shouldVerboseLog =
+      query.toLowerCase().trim() === 'daft punk' || req.query.debug === '1';
     const r = await axios.get(
       `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=6`,
-      { headers: { Authorization: `Bearer ${s.hostSpotify.tokens.access_token}` } }
+      {
+        headers: { Authorization: `Bearer ${s.hostSpotify.tokens.access_token}` },
+        validateStatus: () => true
+      }
     );
-    res.json(r.data.tracks.items.map(t => ({
-      platform: 'spotify',
-      spotifyUri: t.uri,
-      spotifyId: t.id,
-      title: t.name,
-      channel: t.artists.map(a => a.name).join(', '),
-      thumbnail: t.album.images[1]?.url || t.album.images[0]?.url || '',
-      duration: Math.floor(t.duration_ms / 1000) + 's'
-    })));
+    if (shouldVerboseLog) {
+      spotifyDiag('spotify_search_raw_response', {
+        code,
+        query,
+        status: r.status,
+        rawResponse: r.data
+      });
+    }
+    if (r.status === 401 || r.status === 403) {
+      spotifyDiag('spotify_search_auth_error', {
+        code,
+        status: r.status,
+        query: q || '',
+        responseError: r.data?.error || null
+      });
+      return spotifyApiFailure(res, r.status, 'search.fetch');
+    }
+    if (r.status === 429) {
+      console.log('[MOCK_SPOTIFY] Using fallback search (429)');
+      return res.json(mapSpotifyItemsToTrackResults(getDevMockSpotifyItems(q)));
+    }
+    if (r.status !== 200) {
+      spotifyDiag('spotify_search_non200', { code, status: r.status, query: q || '' });
+      return spotifyApiFailure(res, r.status || 502, 'search.fetch');
+    }
+    if (!Array.isArray(r.data?.tracks?.items)) {
+      spotifyDiag('spotify_search_unexpected_shape', {
+        code,
+        query,
+        status: r.status,
+        rawResponse: r.data
+      });
+      return spotifyApiFailure(res, 502, 'search.parse', { message: 'Unexpected Spotify response shape' });
+    }
+    if (r.data.tracks.items.length === 0) {
+      spotifyDiag('spotify_search_empty', {
+        code,
+        query,
+        status: r.status,
+        rawResponse: r.data
+      });
+    }
+    res.json(mapSpotifyItemsToTrackResults(r.data.tracks.items));
   } catch(e) {
-    res.status(500).json([]);
+    spotifyDiag('spotify_search_exception', { code, query: q || '', error: e.response?.data || e.message });
+    console.log('[MOCK_SPOTIFY] Using fallback search (unreachable)');
+    return res.json(mapSpotifyItemsToTrackResults(getDevMockSpotifyItems(q)));
   }
 });
 
@@ -887,6 +1298,21 @@ app.post('/api/test/inject', (req, res) => {
 });
 
 // ─────────────────────────────────────────────
+// Spotify pipeline tick (5s — aligné retry device / consommation progressive)
+// ─────────────────────────────────────────────
+setInterval(() => {
+  for (const code of Object.keys(sessions)) {
+    const s = sessions[code];
+    tickSpotifyPipeline({
+      session: s,
+      code,
+      io,
+      processEnv: process.env,
+      saveSessions
+    }).catch(err => console.warn('[spotify tick]', code, err.message));
+  }
+}, 5000);
+
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`\n🚀 ZPEED running on http://localhost:${PORT}`);
   console.log(`📱 Sur le réseau local : http://${LAN_IP}:${PORT}\n`);

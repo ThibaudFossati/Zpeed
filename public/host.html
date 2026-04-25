@@ -9,7 +9,9 @@
   <script src="https://www.youtube.com/iframe_api"></script>
   <script src="https://sdk.scdn.co/spotify-player.js"></script>
   <style>
-    .container { padding-bottom: 80px; }
+    .container.with-player-bar {
+      padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px) + 24px);
+    }
 
     /* ── Platform pills ── */
     .plat-pill {
@@ -25,28 +27,15 @@
     .plat-pill:active { transform: scale(0.96); }
     .plat-pill .pill-dot { width: 6px; height: 6px; border-radius: 50%; background: transparent; }
 
-    /* ── Spotify connect button ── */
     .spotify-connect-wrap {
-      display: flex; justify-content: center; margin-bottom: 20px;
+      display: flex; justify-content: center; margin-bottom: 20px; width: 100%;
     }
-    .btn-spotify-connect {
-      display: inline-flex; align-items: center; gap: 11px;
-      padding: 13px 28px; border-radius: 99px;
-      background: #1ED760; border: none; cursor: pointer;
-      font-family: 'Roboto', sans-serif; font-size: 0.92rem; font-weight: 700;
-      color: #000; letter-spacing: 0.1px;
-      transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
-      box-shadow: 0 4px 20px rgba(30,215,96,0.30);
-      -webkit-tap-highlight-color: transparent;
-    }
-    .btn-spotify-connect:hover { background: #23f070; transform: translateY(-2px); box-shadow: 0 8px 28px rgba(30,215,96,0.42); }
-    .btn-spotify-connect:active { transform: scale(0.94); box-shadow: 0 2px 10px rgba(30,215,96,0.2); }
     .btn-spotify-connect.connected {
       background: rgba(30,215,96,0.10);
       border: 1.5px solid rgba(30,215,96,0.35);
-      color: #1ED760; box-shadow: none;
+      color: #1ed760; box-shadow: none;
     }
-    .btn-spotify-connect.connected:hover { background: rgba(30,215,96,0.16); transform: none; box-shadow: none; }
+    .btn-spotify-connect.connected:hover { background: rgba(30,215,96,0.16); transform: none; }
     .spotify-profile-pic { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; }
 
     /* ── Spotify chip (header, état connecté) ── */
@@ -388,38 +377,14 @@
     }
     .ticker-sep { display: inline; color: var(--text3); padding: 0 10px; }
 
-    /* ── Search button ── */
-    .btn-search {
-      flex-shrink: 0; width: 46px; height: 46px;
-      border-radius: 14px; border: none; cursor: pointer;
-      background: var(--purple); display: flex; align-items: center; justify-content: center;
-      transition: transform 0.12s, box-shadow 0.12s, background 0.12s;
-      box-shadow: 0 3px 14px rgba(0,212,200,0.38);
-      -webkit-tap-highlight-color: transparent;
-      position: relative; overflow: hidden;
-    }
-    .btn-search svg { transition: transform 0.15s; }
-    .btn-search:hover { background: var(--purple-light); box-shadow: 0 5px 20px rgba(0,212,200,0.5); }
-    .btn-search:hover svg { transform: translateX(2px); }
-    .btn-search:active { transform: scale(0.88); box-shadow: none; }
-    .btn-search::after {
-      content: ''; position: absolute; inset: 0; border-radius: 14px;
-      background: radial-gradient(circle at center, rgba(255,255,255,0.28) 0%, transparent 65%);
-      opacity: 0; transition: opacity 0.3s;
-    }
-    .btn-search:active::after { opacity: 1; transition: opacity 0s; }
+    /* .btn-search + .search-suggestions: globaux (style.css) — états spécifiques host */
 
-    /* ── Search suggestions dropdown ── */
-    .search-wrap { position: relative; }
     .search-suggestions {
       position: absolute; top: calc(100% + 6px); left: 0;
-      width: calc(100% - 54px); /* largeur input sans le bouton */
-      background: rgba(20,20,28,0.97);
-      border: 1px solid var(--border2);
-      border-radius: 16px; overflow: hidden;
+      background: rgba(18,18,20,0.98);
+      border-radius: 12px; overflow: hidden;
       z-index: 500;
-      box-shadow: 0 12px 40px rgba(0,0,0,0.5);
-      backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
       display: none;
     }
     .search-suggestions.open { display: block; animation: suggFadeIn 0.18s ease; }
@@ -455,31 +420,10 @@
       color: var(--purple-light); font-size: 1rem; font-weight: 300; line-height: 1;
     }
 
-    /* Search results */
-    .host-result {
-      display: flex; align-items: center; gap: 12px;
-      padding: 8px 10px 8px 8px; border-radius: 14px;
-      background: var(--bg2); border: 1px solid transparent;
-      margin-bottom: 6px;
-      cursor: pointer; user-select: none;
-      transition: background 0.12s, transform 0.1s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .host-result:hover { background: var(--bg3); }
-    .host-result:active { background: var(--bg4); transform: scale(0.984); }
-    .host-result img { width: 46px; height: 46px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
     .host-result-info { flex: 1; min-width: 0; }
-    .host-result-title { font-weight: 600; font-size: 0.84rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .host-result-meta { font-size: 0.7rem; color: var(--text2); margin-top: 2px; display: flex; align-items: center; gap: 6px; }
-    .btn-add-plus {
-      width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
-      background: rgba(0,212,200,0.14);
-      border: 1.5px solid rgba(0,212,200,0.28);
-      display: flex; align-items: center; justify-content: center;
-      color: var(--purple-light); font-size: 1.25rem; font-weight: 300;
-      line-height: 1; pointer-events: none;
-    }
-    .plat-badge { font-size: 0.6rem; font-weight: 700; padding: 2px 6px; border-radius: 99px; }
+    .host-result-title { font-size: var(--font-title, 1rem); }
+    .host-result-meta { font-size: var(--font-sec, 0.875rem); }
+    .plat-badge { font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 8px; }
     .plat-badge.yt  { background: rgba(255,68,68,0.15); color: #FF4444; }
     .plat-badge.sp  { background: rgba(30,215,96,0.15); color: #1ED760; }
 
@@ -714,12 +658,14 @@
   <script src="observatory.js"></script>
 </head>
 <body>
-<div class="container with-mini">
+<div class="container with-player-bar">
 
   <!-- BETA BANNER -->
   <div style="background:rgba(255,165,0,0.06);border:1px solid rgba(255,165,0,0.14);border-radius:99px;padding:5px 14px;text-align:center;font-size:0.62rem;color:#FFA500;font-weight:600;margin-bottom:4px;letter-spacing:0.3px;align-self:center">
     🧪 Beta · Tes retours comptent !
   </div>
+
+  <div id="hostSpotifyBanner" style="display:none;width:100%;text-align:center;font-size:0.72rem;font-weight:600;padding:9px 12px;border-radius:12px;margin-bottom:6px;line-height:1.35"></div>
 
   <!-- HEADER -->
   <div class="header">
@@ -809,7 +755,7 @@
 
     <!-- Spotify connect button -->
     <div class="spotify-connect-wrap">
-      <button class="btn-spotify-connect" id="btn-spotify" onclick="connectPlatform('spotify')">
+      <button type="button" class="btn btn-spotify btn-block btn-spotify-connect" id="btn-spotify" onclick="connectPlatform('spotify')">
         <!-- Spotify logo officiel (currentColor = noir sur vert, vert sur fond sombre connecté) -->
         <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
           <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.623.623 0 0 1-.857.207c-2.348-1.435-5.304-1.759-8.785-.964a.623.623 0 1 1-.277-1.215c3.809-.87 7.076-.496 9.712 1.115a.623.623 0 0 1 .207.857zm1.223-2.722a.78.78 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.78.78 0 0 1-.973-.52.781.781 0 0 1 .52-.973c3.632-1.102 8.147-.568 11.233 1.329a.78.78 0 0 1 .257 1.073zm.105-2.835C14.692 8.95 9.375 8.775 6.297 9.71a.937.937 0 1 1-.543-1.793c3.532-1.072 9.404-.865 13.115 1.338a.937.937 0 0 1-.954 1.612z"/>
@@ -821,14 +767,13 @@
 
     <!-- Search bar (always visible) -->
     <div class="search-wrap" style="margin-bottom:12px">
-      <div style="display:flex;gap:8px;align-items:center">
-        <input type="text" id="hostSearchInput" class="input" placeholder="Artiste, titre, vibe..."
+      <div class="search-field-row">
+        <input type="text" id="hostSearchInput" class="input input--search" placeholder="Artiste, titre, vibe…"
                autocomplete="off" spellcheck="false"
                oninput="onSearchInput(this.value)"
-               onkeydown="onSearchKeydown(event)"
-               style="font-size:0.9rem;flex:1">
-        <button class="btn-search" onclick="hostSearch()" aria-label="Rechercher">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+               onkeydown="onSearchKeydown(event)">
+        <button type="button" class="btn-search" id="hostSearchBtn" onclick="hostSearch()" aria-label="Rechercher">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <line x1="5" y1="12" x2="19" y2="12"/>
             <polyline points="13 6 19 12 13 18"/>
           </svg>
@@ -860,6 +805,7 @@
   <!-- ═══ PANEL : QUEUE ═══ -->
   <div class="tab-panel" id="panel-queue">
     <div class="section-title" style="display:flex;align-items:center;gap:7px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.6;flex-shrink:0"><rect x="3" y="4" width="18" height="2.5" rx="1.25"/><rect x="3" y="10.75" width="18" height="2.5" rx="1.25"/><rect x="3" y="17.5" width="12" height="2.5" rx="1.25"/></svg> File d'attente <span id="queueCount" style="color:var(--purple-light)"></span></div>
+    <div id="zpeedHostTop3" class="zpeed-top3-wrap" aria-live="polite"></div>
     <div id="queueList">
       <div class="empty">
         <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
@@ -958,7 +904,7 @@
         </svg>
       </button>
       <!-- Volume -->
-      <button class="am-btn">
+      <button class="am-btn" id="amVolumeBtn" onclick="cycleSpotifyVolume()">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
           <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
@@ -989,19 +935,18 @@
 
   <!-- ═══ PANEL : QR CODE ═══ -->
   <div class="tab-panel" id="panel-qr">
-    <div style="margin-bottom:16px;text-align:center">
-      <div class="label" style="margin-bottom:12px">📱 Les guests scannent ce QR pour rejoindre</div>
+    <div class="qr-panel">
       <div class="qr-wrapper" id="qrWrapper">
-        <canvas id="qrCanvas" width="280" height="280"></canvas>
-        <div class="session-code" id="sessionCodeDisplay"></div>
+        <div class="qr-card">
+          <canvas id="qrCanvas" width="280" height="280"></canvas>
+        </div>
+        <div class="qr-helper-text">Scan to join</div>
       </div>
     </div>
-    <!-- LAN URL display -->
-    <div class="glass" style="margin-bottom:12px;border-radius:var(--radius);padding:12px 14px;display:flex;align-items:center;gap:8px;cursor:pointer" onclick="copyQrLink()" id="qrLinkRow">
-      <span style="font-size:1rem;position:relative;z-index:1">🔗</span>
-      <span id="qrLinkText" style="font-size:0.75rem;color:var(--purple-light);font-family:monospace;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;position:relative;z-index:1"></span>
-      <span style="font-size:0.75rem;color:var(--text2);position:relative;z-index:1">copier</span>
+    <div class="qr-link-preview" id="qrLinkRow">
+      <span id="qrLinkText"></span>
     </div>
+    <button class="btn btn-secondary" onclick="copyQrLink()">Copy invite link</button>
     <button class="btn btn-secondary" onclick="openShare()">
       📤 Partager le lien à la place
     </button>
@@ -1011,25 +956,6 @@
   </div>
 
 </div><!-- /container -->
-
-<!-- ═══ STICKY MINI PLAYER ═══ -->
-<div class="mini-player" id="miniPlayer">
-  <div class="mini-player-inner">
-    <img class="mini-thumb" id="miniThumb" src="" onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22%3E%3Crect width=%2224%22 height=%2224%22 fill=%22%231a1a24%22/%3E%3Cpath d=%22M9 17V6l10-2V15%22 stroke=%22%2300d4c8%22 stroke-width=%221.6%22 stroke-linecap=%22round%22 fill=%22none%22/%3E%3Ccircle cx=%227%22 cy=%2217%22 r=%222.2%22 fill=%22%2300d4c8%22/%3E%3Ccircle cx=%2217%22 cy=%2215%22 r=%222.2%22 fill=%22%2300d4c8%22/%3E%3C/svg%3E'">
-    <div class="mini-info">
-      <div class="mini-title" id="miniTitle">Aucune lecture</div>
-      <div class="mini-sub"   id="miniSub">—</div>
-    </div>
-    <div class="mini-controls">
-      <button class="btn btn-small" onclick="skipTrack()" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.06);padding:0;min-height:unset;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.8)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
-      </button>
-      <button class="btn btn-small" onclick="switchTab('playing')" style="width:36px;height:36px;border-radius:50%;background:var(--purple);border:none;padding:0;min-height:unset;display:flex;align-items:center;justify-content:center;color:#061014">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-      </button>
-    </div>
-  </div>
-</div>
 
 <!-- ═══ SHARE MODAL ═══ -->
 <div class="modal-overlay" id="shareModal" onclick="closeModalIfBg(event,'shareModal')">
@@ -1053,12 +979,16 @@
 <div id="reactionFeed"></div>
 
 <script>
-  const code      = localStorage.getItem('zpeed_code');
-  const hostId    = localStorage.getItem('zpeed_hostId');
-  const qrDataUrl = localStorage.getItem('zpeed_qr');
-  const speakerNm = localStorage.getItem('zpeed_hostName') || 'Session active';
+  const code       = localStorage.getItem('zpeed_code');
+  const hostId     = localStorage.getItem('zpeed_hostId');
+  const hostSecret   = localStorage.getItem('zpeed_hostSecret');
+  const qrDataUrl  = localStorage.getItem('zpeed_qr');
+  const speakerNm  = localStorage.getItem('zpeed_hostName') || 'Session active';
 
-  if (!code || !hostId) window.location.href = 'index.html';
+  if (!code || !hostId || !hostSecret) window.location.href = 'index.html';
+
+  const spotifyTokenUrl = () =>
+    `/api/spotify/token?code=${encodeURIComponent(code)}&secret=${encodeURIComponent(hostSecret)}`;
 
   const PLATFORMS = {
     spotify: { label: 'Spotify', icon: '🎵' },
@@ -1114,7 +1044,7 @@
   const _demoTrack = DEMO_TRACKS[Math.floor(Math.random() * DEMO_TRACKS.length)];
   updateTicker(_demoTrack.title, _demoTrack.artist);
 
-  // ── LIVE QR CANVAS RENDERER ─────────────────────────────────────
+  // ── STATIC QR CANVAS RENDERER (high-contrast scan-safe) ────────
   let _qrRAF = null;
   function initLiveQR(matrix, size) {
     const canvas = document.getElementById('qrCanvas');
@@ -1127,105 +1057,24 @@
     canvas.height = CSS_W * DPR;
     ctx.scale(DPR, DPR);
 
-    const MARGIN    = 2;           // quiet zone in modules
-    const CELL      = CSS_W / (size + MARGIN * 2);
-    const OFF       = MARGIN * CELL;
-    const R_RATIO   = 0.30;        // corner radius relative to cell
-
-    // Velocity & scroll for organic distortion
-    let velX = 0, velY = 0;
-    let lastTX = 0, lastTY = 0, touching = false;
-    let time = 0;
-
-    function onTouchStart(e) {
-      const t = e.touches[0];
-      lastTX = t.clientX; lastTY = t.clientY; touching = true;
-    }
-    function onTouchMove(e) {
-      if (!touching) return;
-      const t = e.touches[0];
-      velX += (t.clientX - lastTX) * 0.8;
-      velY += (t.clientY - lastTY) * 0.8;
-      lastTX = t.clientX; lastTY = t.clientY;
-    }
-    function onTouchEnd() { touching = false; }
-    // Also respond to mouse wheel / scroll
-    function onWheel(e) {
-      velX += e.deltaX * 0.3;
-      velY += e.deltaY * 0.3;
-    }
-    window.addEventListener('touchstart',  onTouchStart, { passive: true });
-    window.addEventListener('touchmove',   onTouchMove,  { passive: true });
-    window.addEventListener('touchend',    onTouchEnd);
-    window.addEventListener('wheel',       onWheel,      { passive: true });
-
-    function rrect(ctx, x, y, w, h, r) {
-      ctx.beginPath();
-      ctx.moveTo(x + r, y);
-      ctx.lineTo(x + w - r, y);
-      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-      ctx.lineTo(x + w, y + h - r);
-      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-      ctx.lineTo(x + r, y + h);
-      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-      ctx.lineTo(x, y + r);
-      ctx.quadraticCurveTo(x, y, x + r, y);
-      ctx.closePath();
-    }
-
-    function draw() {
-      // Decay velocity → "spring back" feel
-      velX *= 0.88;
-      velY *= 0.88;
-      time++;
-
-      // Base slow organic wave (always alive)
-      const baseAmp = 1.2;
-      // Extra amplitude driven by scroll velocity
-      const scrollAmp = Math.min(Math.sqrt(velX * velX + velY * velY) * 0.08, 6);
-      const totalAmp = baseAmp + scrollAmp;
-
-      ctx.clearRect(0, 0, CSS_W, CSS_W);
-
-      // ── Dark overlay (the "surface") ──
-      // Draw all light modules as dark fill — but skip dark modules (the holes)
-      for (let row = 0; row < size; row++) {
-        for (let col = 0; col < size; col++) {
-          const isDark = matrix[row * size + col];
-
-          // Wave displacement: different frequency per axis for organic feel
-          const waveX = Math.sin(row * 0.45 + time * 0.018 + velY * 0.012) * totalAmp
-                      + Math.cos(col * 0.3  + time * 0.011) * (baseAmp * 0.5);
-          const waveY = Math.cos(col * 0.38 + time * 0.014 + velX * 0.012) * totalAmp
-                      + Math.sin(row * 0.28 + time * 0.009) * (baseAmp * 0.5);
-
-          const x = OFF + col * CELL + waveX;
-          const y = OFF + row * CELL + waveY;
-          const pad = isDark ? CELL * 0.10 : CELL * 0.02;
-          const s   = CELL - pad * 2;
-          const r   = s * (isDark ? R_RATIO : 0.12);
-
-          if (isDark) {
-            // HOLE = cut through to bg.js — draw nothing (clearRect doesn't work in compositing here)
-            // Instead: draw transparent (skip) so canvas background (transparent) shows bg.js
-            continue;
-          } else {
-            // Surface = opaque dark panel
-            ctx.fillStyle = 'rgba(6, 6, 16, 0.86)';
-            rrect(ctx, x + pad, y + pad, s, s, r);
-            ctx.fill();
-          }
-        }
-      }
-
-      // ── Finder pattern borders (keep crisp, only outline, no fill on dark ones) ──
-      // Already handled above — dark modules are transparent
-
-      _qrRAF = requestAnimationFrame(draw);
-    }
-
+    const MARGIN = 2;
+    const CELL   = CSS_W / (size + MARGIN * 2);
+    const OFF    = MARGIN * CELL;
     if (_qrRAF) cancelAnimationFrame(_qrRAF);
-    draw();
+    ctx.clearRect(0, 0, CSS_W, CSS_W);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, CSS_W, CSS_W);
+    ctx.fillStyle = '#000000';
+    for (let row = 0; row < size; row++) {
+      for (let col = 0; col < size; col++) {
+        const isDark = matrix[row * size + col];
+        if (!isDark) continue;
+        const x = Math.round(OFF + col * CELL);
+        const y = Math.round(OFF + row * CELL);
+        const s = Math.ceil(CELL);
+        ctx.fillRect(x, y, s, s);
+      }
+    }
   }
 
   // Try to load matrix from localStorage (cached from session create)
@@ -1257,12 +1106,17 @@
   });
 
   const socket = io();
-  function joinRoom() { socket.emit('host:join', { code, hostId }); }
+  function joinRoom() { socket.emit('host:join', { code, hostId, hostSecret }); }
   socket.on('connect', joinRoom);
 
   let queue        = [];
   let currentTrack = null;
   let guests       = [];
+  let roomMeta     = {};
+  let hostVotedTracks = new Set();
+  /** @type {Record<string, { v: number, s: string }>} */
+  let prevTrackSnap = {};
+  const VALIDATION_LABEL = 'VALIDÉ'; // switch here later (e.g. "APPROVED")
   let currentPlatformForPlaylists = null;
 
   // Flat music-note placeholder for broken thumbnails
@@ -1276,6 +1130,9 @@
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.getElementById(`tab-${name}`).classList.add('active');
     document.getElementById(`panel-${name}`).classList.add('active');
+    const amBar = document.getElementById('amBar');
+    if (amBar && name !== 'playing') amBar.classList.remove('visible');
+    if (amBar && name === 'playing' && currentTrack) amBar.classList.add('visible');
   }
 
   // ─────────────────────────────────────────────
@@ -1287,6 +1144,10 @@
     if (btn && btn.classList.contains('connected')) { openPlaylists(platform); return; }
 
     if (platform === 'spotify') {
+      if (window._spotifyRateLimited) {
+        showToast('Spotify temporairement indisponible');
+        return;
+      }
       window.location.href = `/auth/spotify?sessionCode=${code}`;
       return;
     }
@@ -1301,6 +1162,11 @@
       const res = await fetch('https://api.spotify.com/v1/me', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      if (res.status === 429) {
+        markSpotifyUnavailable('Spotify temporarily unavailable');
+        console.warn('[spotify] /v1/me rate-limited (429)');
+        return null;
+      }
       if (!res.ok) return null;
       const me = await res.json();
       return {
@@ -1312,21 +1178,29 @@
 
   async function handleSpotifyServerCallback() {
     try {
-      const res = await fetch(`/api/spotify/token?code=${code}`);
+      const res = await fetch(spotifyTokenUrl());
       if (!res.ok) return;
       const data = await res.json();
       if (!data.access_token) return;
+      window._spotifyMockMode = !!data.use_mock_spotify;
       window._spotifyToken = data.access_token;
       localStorage.setItem('zpeed_spotify_token', data.access_token);
       // Use profile from server if available, otherwise fetch from Spotify API
       const profile = data.profile || await fetchSpotifyProfile(data.access_token);
       markConnected('spotify', profile);
+      if (window._spotifyMockMode) {
+        markSpotifyUnavailable('Spotify temporarily unavailable');
+      } else {
+        window._spotifyRateLimited = false;
+        setSpotifyControlsDisabled(false);
+      }
       showNotif({ icon: '🎵', title: 'Spotify connecté !', type: 'success' });
     } catch(e) { console.error('Spotify callback error:', e); }
   }
 
   // Legacy PKCE callback handler (in case of old redirects)
   async function handleSpotifyPKCECallback(authCode) {
+    if (window._spotifyRateLimited) return;
     // Redirect to server-side flow instead
     showToast('⚠️ Redirecting to Spotify...');
     window.location.href = `/auth/spotify?sessionCode=${code}`;
@@ -1354,13 +1228,15 @@
     // Also check server for Spotify token (in case server-side OAuth was used)
     if (!window._spotifyToken) {
       try {
-        const res = await fetch(`/api/spotify/token?code=${code}`);
+        const res = await fetch(spotifyTokenUrl());
         if (res.ok) {
           const data = await res.json();
+          window._spotifyMockMode = !!data.use_mock_spotify;
           if (data.access_token) {
             window._spotifyToken = data.access_token;
             localStorage.setItem('zpeed_spotify_token', data.access_token);
             markConnected('spotify');
+            if (window._spotifyMockMode) markSpotifyUnavailable('Spotify temporarily unavailable');
           }
         }
       } catch(e) {}
@@ -1454,8 +1330,8 @@
       return;
     }
     document.getElementById('playlistsList').innerHTML = data.map(p => `
-      <div class="search-result" onclick="loadPlaylistTracks('${p.id}', '${(p.title||'').replace(/'/g,"\\'")}')">
-        <img class="search-thumb" src="${p.thumbnail||''}" onerror="this.style.display='none'" style="border-radius:8px">
+      <div class="search-result track-card" onclick="loadPlaylistTracks('${p.id}', '${(p.title||'').replace(/'/g,"\\'")}')">
+        <img class="search-thumb" src="${p.thumbnail||''}" onerror="this.style.display='none'" alt="">
         <div style="flex:1;min-width:0">
           <div style="font-weight:600;font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.title}</div>
           <div style="font-size:0.75rem;color:var(--text2)">${p.count||0} titres</div>
@@ -1520,8 +1396,19 @@
   async function fetchSuggestions(q) {
     try {
       const spProm = fetch(`/api/spotify/search?q=${encodeURIComponent(q)}&code=${code}`)
-        .then(r => r.json()).catch(() => []);
+        .then(async r => {
+          const body = await r.json().catch(() => ({}));
+          if (!r.ok) return { __error: true, status: r.status, body };
+          return body;
+        })
+        .catch(() => ({ __error: true, status: 0, body: { message: 'Spotify unreachable' } }));
       const results = await spProm;
+      if (results && results.__error) {
+        showToast(`Spotify: ${results.body?.message || results.body?.error || 'search failed'}`);
+        _suggestData = [];
+        hideSuggestions();
+        return;
+      }
       _suggestData = Array.isArray(results) ? results.slice(0, 6) : [];
       renderSuggestions(_suggestData, q);
     } catch(e) { hideSuggestions(); }
@@ -1536,12 +1423,13 @@
       const thumb = t.thumbnail
         ? `<img class="sugg-thumb" src="${t.thumbnail}" onerror="this.style.display='none'">`
         : `<div class="sugg-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>`;
+      const devMock = (t.isMock || t.isDevMock) ? ' · DEV MOCK' : '';
       return `
         <div class="sugg-item" data-idx="${i}" onclick='selectSuggestion(${safe})'>
           ${thumb}
           <div class="sugg-text">
             <div class="sugg-title">${t.title}</div>
-            <div class="sugg-artist">${t.channel || t.artist || ''}</div>
+            <div class="sugg-artist">${t.channel || t.artist || ''}${devMock}</div>
           </div>
           <div class="sugg-add">+</div>
         </div>`;
@@ -1568,46 +1456,81 @@
     if (!e.target.closest('.search-wrap')) hideSuggestions();
   });
 
+  function searchResultsSkeleton(n = 4) {
+    const row = () => `<div class="skeleton-row"><div class="skeleton-avatar"></div><div class="skeleton-lines"><div class="skeleton-line w-90"></div><div class="skeleton-line w-60"></div></div></div>`;
+    return `<div class="skeleton-list" aria-busy="true" aria-label="Recherche…">${Array.from({ length: n }, row).join('')}</div>`;
+  }
+
   async function hostSearch() {
     const q = document.getElementById('hostSearchInput').value.trim();
     hideSuggestions();
     if (!q) return;
     const el = document.getElementById('hostSearchResults');
-    el.innerHTML = `<div style="text-align:center;color:var(--text2);padding:16px;font-size:0.85rem">⏳ Recherche...</div>`;
-
+    const searchBtn = document.getElementById('hostSearchBtn');
+    if (searchBtn) {
+      searchBtn.classList.add('is-loading');
+      searchBtn.disabled = true;
+    }
+    el.innerHTML = searchResultsSkeleton(4);
+    try {
     const [ytRes, spRes] = await Promise.allSettled([
       fetch(`/api/search?q=${encodeURIComponent(q)}`).then(r => r.json()).catch(() => []),
-      fetch(`/api/spotify/search?q=${encodeURIComponent(q)}&code=${code}`).then(r => r.json()).catch(() => [])
+      fetch(`/api/spotify/search?q=${encodeURIComponent(q)}&code=${code}`)
+        .then(async r => {
+          const body = await r.json().catch(() => ({}));
+          if (!r.ok) return { __error: true, status: r.status, body };
+          return body;
+        })
+        .catch(() => ({ __error: true, status: 0, body: { message: 'Spotify unreachable' } }))
     ]);
 
     const ytTracks = (ytRes.status === 'fulfilled' && Array.isArray(ytRes.value)) ? ytRes.value : [];
-    const spTracks = (spRes.status === 'fulfilled' && Array.isArray(spRes.value)) ? spRes.value : [];
+    const spValue = spRes.status === 'fulfilled' ? spRes.value : [];
+    if (spValue && spValue.__error) {
+      const msg = spValue.body?.message || spValue.body?.error || 'Spotify search failed';
+      el.innerHTML = `<div class="empty"><div class="empty-text" style="color:#f87171">Spotify: ${msg}</div></div>`;
+      return;
+    }
+    const spTracks = Array.isArray(spValue) ? spValue : [];
     const results  = [...spTracks, ...ytTracks];
 
     if (results.length === 0) {
-      el.innerHTML = `<div style="text-align:center;color:var(--text2);padding:24px;font-size:0.85rem">Aucun résultat pour "${q}"</div>`;
+      el.innerHTML = `<div class="empty"><div class="empty-text">Aucun résultat pour "${q}"</div></div>`;
       return;
     }
 
     el.innerHTML = results.map(t => {
       const isSp  = t.platform === 'spotify';
-      const badge = isSp ? `<span class="plat-badge sp">Spotify</span>` : `<span class="plat-badge yt">YT</span>`;
+      const badge = isSp
+        ? ((t.isMock || t.isDevMock) ? `<span class="plat-badge sp">DEV MOCK</span>` : `<span class="plat-badge sp">Spotify</span>`)
+        : `<span class="plat-badge yt">YT</span>`;
       const safe  = JSON.stringify(t).replace(/"/g,'&quot;');
       return `
-        <div class="host-result" onclick='hostAddTrack(${safe})'>
-          <img src="${t.thumbnail||''}" onerror="this.onerror=null;this.src=THUMB_FALLBACK">
-          <div class="host-result-info">
+        <div class="host-result search-result track-card" role="button" tabindex="0" onclick='hostAddFromCard(this, ${safe})'>
+          <img src="${t.thumbnail||''}" onerror="this.onerror=null;this.src=THUMB_FALLBACK" alt="" class="search-thumb">
+          <div class="host-result-info" style="flex:1;min-width:0">
             <div class="host-result-title">${t.title}</div>
             <div class="host-result-meta">${badge}<span>${t.channel||t.artist||''}</span></div>
           </div>
-          <div class="btn-add-plus">+</div>
+          <div class="btn-add-plus" aria-hidden="true">+</div>
         </div>`;
     }).join('');
+    } finally {
+      if (searchBtn) {
+        searchBtn.classList.remove('is-loading');
+        searchBtn.disabled = false;
+      }
+    }
+  }
+
+  function hostAddFromCard(el, track) {
+    if (el) el.classList.add('track-card--adding');
+    setTimeout(() => hostAddTrack(track), 200);
   }
 
   function hostAddTrack(track) {
     const hostName = localStorage.getItem('zpeed_hostName') || 'Host';
-    socket.emit('track:propose', { code, track, guestName: hostName, userName: hostName });
+    socket.emit('track:propose', { code, track, guestName: hostName, userName: hostName, hostId });
     showToast(`✅ "${track.title}" ajouté`);
     document.getElementById('hostSearchInput').value = '';
     document.getElementById('hostSearchResults').innerHTML = '';
@@ -1629,17 +1552,17 @@
     el.innerHTML = tracks.map(t => {
       const safe = JSON.stringify(t).replace(/"/g,'&quot;');
       return `
-      <div class="search-result" onclick='addToQueue(${safe})'>
-        <img class="search-thumb" src="${t.thumbnail||''}" onerror="this.onerror=null;this.src=THUMB_FALLBACK">
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:600;font-size:0.84rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.title}</div>
-          <div style="font-size:0.71rem;color:var(--text2);margin-top:2px">${t.channel}${t.duration ? ' · ' + t.duration : ''}</div>
+      <div class="search-result track-card" role="button" onclick='addToQueueFromCard(this, ${safe})'>
+        <img class="search-thumb" src="${t.thumbnail||''}" onerror="this.onerror=null;this.src=THUMB_FALLBACK" alt="">
+        <div style="flex:1;min-width:0;align-self:center">
+          <div class="host-result-title" style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.title}</div>
+          <div style="font-size:0.875rem;color:var(--text2);margin-top:2px">${t.channel}${t.duration ? ' · ' + t.duration : ''}</div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0" onclick="event.stopPropagation()">
-          ${t.preview ? `<div class="track-preview" onclick="previewTrack('${t.preview}')">▶</div>` : ''}
-          <button class="btn btn-small btn-green" style="padding:5px 10px;font-size:0.72rem" onclick='playNow(${safe})'>▶</button>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;align-self:center" onclick="event.stopPropagation()">
+          ${t.preview ? `<div class="track-preview" onclick="event.stopPropagation();previewTrack('${t.preview}')">▶</div>` : ''}
+          <button type="button" class="btn btn-small btn-green ui-btn-play" onclick="event.stopPropagation();playNow(${safe})" aria-label="Lecture">▶</button>
         </div>
-        <div class="btn-add-plus" style="pointer-events:none">+</div>
+        <div class="btn-add-plus" aria-hidden="true">+</div>
       </div>`;
     }).join('');
   }
@@ -1657,6 +1580,11 @@
   // ─────────────────────────────────────────────
   // QUEUE
   // ─────────────────────────────────────────────
+  function addToQueueFromCard(el, track) {
+    if (el) el.classList.add('track-card--adding');
+    setTimeout(() => addToQueue(track), 200);
+  }
+
   function addToQueue(track) {
     socket.emit('track:add_from_playlist', { code, track });
     showToast(`🎵 "${track.title}" ajouté à la file`);
@@ -1715,27 +1643,64 @@
   window._spotifyToken    = null;
   window._spotifyDeviceId = null;
   window._spotifyPlayer   = null;
+  window._spotifyRateLimited = false;
+  window._spotifyMockMode = false;
+  window._spotifyVolume = 0.8;
+  window._spotifySdkConnected = false;
+
+  function setSpotifyControlsDisabled(disabled) {
+    const playBtn = document.getElementById('amPlayBtn');
+    const volBtn = document.getElementById('amVolumeBtn');
+    [playBtn, volBtn].forEach(btn => {
+      if (!btn) return;
+      btn.disabled = !!disabled;
+      btn.style.opacity = disabled ? '0.45' : '';
+      btn.style.pointerEvents = disabled ? 'none' : '';
+    });
+  }
+
+  function markSpotifyUnavailable(reason = 'Spotify temporarily unavailable') {
+    window._spotifyRateLimited = true;
+    setSpotifyControlsDisabled(true);
+    const status = document.getElementById('spotify-player-status');
+    if (status) {
+      status.style.display = 'block';
+      status.style.color = '#fbbf24';
+      status.textContent = reason;
+    }
+    console.warn('[spotify] playback disabled:', reason);
+  }
 
   window.onSpotifyWebPlaybackSDKReady = function() {
-    if (!window._spotifyToken) return;
+    if (!window._spotifyToken || window._spotifyMockMode || window._spotifyRateLimited) return;
+    console.log('[spotify] Web Playback SDK ready callback');
     const player = new Spotify.Player({
       name: 'ZPEED 🎵',
       getOAuthToken: cb => cb(window._spotifyToken),
-      volume: 0.8
+      volume: window._spotifyVolume
     });
 
-    player.addListener('ready', ({ device_id }) => {
+    player.addListener('ready', async ({ device_id }) => {
+      console.log('[spotify] device ready:', device_id);
       window._spotifyDeviceId = device_id;
+      window._spotifySdkConnected = true;
+      window._spotifyRateLimited = false;
+      setSpotifyControlsDisabled(false);
       showToast('🎵 Spotify prêt — cet appareil joue sur l\'enceinte');
-      // Transfer playback to this device
-      fetch('https://api.spotify.com/v1/me/player', {
+      socket.emit('host:spotify_device', { code, hostSecret, deviceId: device_id });
+      const transferRes = await fetch('https://api.spotify.com/v1/me/player', {
         method: 'PUT',
         body: JSON.stringify({ device_ids: [device_id], play: false }),
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window._spotifyToken}` }
       });
+      console.log('[spotify] transfer playback status:', transferRes.status);
+      if (transferRes.status === 429) {
+        markSpotifyUnavailable('Spotify temporarily unavailable');
+      }
     });
 
     player.addListener('player_state_changed', state => {
+      console.log('[spotify] state changed:', state ? { paused: state.paused, position: state.position } : null);
       if (!state || !state.paused) return;
       // Track ended = paused at position 0 with a previous track
       if (state.position === 0 && state.track_window.previous_tracks.length > 0) {
@@ -1743,15 +1708,20 @@
       }
     });
 
-    player.addListener('not_ready',         () => showToast('⚠️ Spotify déconnecté'));
+    player.addListener('not_ready', () => {
+      showToast('⚠️ Spotify déconnecté');
+      socket.emit('host:playback_lost', { code, hostSecret });
+    });
     player.addListener('authentication_error', ({ message }) => {
       console.warn('Spotify auth error:', message);
       localStorage.removeItem('zpeed_spotify_token');
       window._spotifyToken = null;
+      socket.emit('host:playback_lost', { code, hostSecret });
+      setSpotifyControlsDisabled(true);
     });
     player.addListener('account_error',     ({ message }) => console.warn('Spotify account error:', message));
     player.addListener('playback_error',    ({ message }) => console.warn('Spotify playback error:', message));
-    player.connect();
+    player.connect().then(ok => console.log('[spotify] player.connect():', ok));
     window._spotifyPlayer = player;
   };
 
@@ -1760,9 +1730,15 @@
       // Use PKCE token from localStorage first, fallback to server session
       let access_token = window._spotifyToken || localStorage.getItem('zpeed_spotify_token');
       if (!access_token) {
-        const res = await fetch(`/api/spotify/token?code=${code}`);
+        const res = await fetch(spotifyTokenUrl());
         if (!res.ok) return;
-        access_token = (await res.json()).access_token;
+        const data = await res.json();
+        access_token = data.access_token;
+        window._spotifyMockMode = !!data.use_mock_spotify;
+      }
+      if (window._spotifyMockMode) {
+        markSpotifyUnavailable('Spotify temporarily unavailable');
+        return;
       }
       window._spotifyToken = access_token;
       if (window.Spotify) {
@@ -1772,18 +1748,37 @@
     } catch(e) { /* Spotify not connected */ }
   }
 
-  function playSpotifyTrack(uri) {
+  async function playSpotifyTrack(uri) {
     document.getElementById('spotify-player-status').style.display = 'block';
     document.getElementById('yt-player').style.display = 'none';
-    if (!window._spotifyDeviceId || !window._spotifyToken) {
+    if (window._spotifyMockMode) {
+      markSpotifyUnavailable('Spotify temporarily unavailable');
+      console.log('[spotify] playback skipped (mock mode)');
+      return;
+    }
+    if (!window._spotifyToken || window._spotifyRateLimited) {
+      console.log('[spotify] playback blocked:', { hasToken: !!window._spotifyToken, rateLimited: window._spotifyRateLimited });
+      return;
+    }
+    if (!window._spotifyDeviceId) {
       showToast('⚠️ Spotify non initialisé sur cet appareil');
       return;
     }
-    fetch(`https://api.spotify.com/v1/me/player/play?device_id=${window._spotifyDeviceId}`, {
+    console.log('[spotify] playback attempt:', { uri, deviceId: window._spotifyDeviceId });
+    const res = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${window._spotifyDeviceId}`, {
       method: 'PUT',
       body: JSON.stringify({ uris: [uri] }),
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window._spotifyToken}` }
-    }).catch(e => showToast('⚠️ Erreur Spotify: ' + e.message));
+    }).catch(e => {
+      console.warn('[spotify] playback request failed:', e.message);
+      return null;
+    });
+    if (!res) return;
+    console.log('[spotify] playback response:', res.status);
+    if (res.status === 429) {
+      markSpotifyUnavailable('Spotify temporarily unavailable');
+      return;
+    }
   }
 
   // ─────────────────────────────────────────────
@@ -1852,30 +1847,86 @@
   // ─────────────────────────────────────────────
   // SOCKET EVENTS
   // ─────────────────────────────────────────────
-  socket.on('session:update', ({ guestCount, queue: q, guestList }) => {
+  function updateHostBanner() {
+    const el = document.getElementById('hostSpotifyBanner');
+    if (!el) return;
+    if (roomMeta.playerLost) {
+      el.style.display = 'block';
+      el.style.background = 'rgba(255,59,48,0.10)';
+      el.style.border = '1px solid rgba(255,59,48,0.22)';
+      el.style.color = '#FF8A80';
+      el.textContent = 'Connexion au player perdue. Nouvelle tentative automatique toutes les 5 s…';
+      return;
+    }
+    if (roomMeta.spotifyNeedsDevice) {
+      el.style.display = 'block';
+      el.style.background = 'rgba(255,193,7,0.10)';
+      el.style.border = '1px solid rgba(255,193,7,0.22)';
+      el.style.color = '#FFC107';
+      el.textContent = 'Connecte un appareil Spotify pour lancer la musique.';
+      return;
+    }
+    el.style.display = 'none';
+    el.textContent = '';
+  }
+
+  socket.on('room:state', (st) => {
+    roomMeta = { ...roomMeta, ...st };
+    updateHostBanner();
+    renderQueue();
+    renderHostTop3();
+  });
+
+  socket.on('session:update', ({ guestCount, queue: q, guestList, meta }) => {
     document.getElementById('guestBadgeCount').textContent = guestCount;
     const b = document.getElementById('badge-guests');
     if (guestCount > 0) { b.textContent = guestCount; b.classList.add('show'); }
     else b.classList.remove('show');
     document.getElementById('guestCountDisplay').textContent = guestCount ? `(${guestCount})` : '';
+    const oldSnap = {};
+    queue.forEach(t => {
+      oldSnap[t.id] = { v: t.votes | 0, s: t.status || 'pending' };
+    });
     guests = guestList || [];
-    queue  = q;
+    queue  = q || [];
+    if (meta) roomMeta = { ...roomMeta, ...meta };
+    hostVotedTracks = new Set((queue || []).filter(t => (t.voters || []).includes('host:' + hostId)).map(t => t.id));
+    updateHostBanner();
     renderQueue();
+    renderHostTop3();
+    requestAnimationFrame(() => applyHostQueueClutch(oldSnap, queue));
+    prevTrackSnap = {};
+    queue.forEach(t => {
+      prevTrackSnap[t.id] = { v: t.votes | 0, s: t.status || 'pending' };
+    });
     renderGuests();
     updateObsGuests();
     updateObsQueue();
   });
 
-  socket.on('queue:update', ({ queue: q }) => {
+  socket.on('queue:update', ({ queue: q, meta }) => {
+    const oldSnap = {};
+    queue.forEach(t => {
+      oldSnap[t.id] = { v: t.votes | 0, s: t.status || 'pending' };
+    });
     queue = q;
+    if (meta) roomMeta = { ...roomMeta, ...meta };
+    hostVotedTracks = new Set((queue || []).filter(t => (t.voters || []).includes('host:' + hostId)).map(t => t.id));
+    updateHostBanner();
     renderQueue();
+    renderHostTop3();
+    requestAnimationFrame(() => applyHostQueueClutch(oldSnap, q));
+    prevTrackSnap = {};
+    q.forEach(t => {
+      prevTrackSnap[t.id] = { v: t.votes | 0, s: t.status || 'pending' };
+    });
     updateObsQueue();
     const b = document.getElementById('badge-queue');
     if (q.length > 0) { b.textContent = q.length; b.classList.add('show'); }
     else b.classList.remove('show');
   });
 
-  socket.on('track:playing', ({ track }) => {
+  socket.on('track:playing', ({ track, fromServer }) => {
     currentTrack = track;
     renderNowPlaying();
     updateMiniPlayer();
@@ -1885,7 +1936,7 @@
       playVideo(track.videoId);
     } else if (track?.spotifyUri) {
       switchTab('playing');
-      playSpotifyTrack(track.spotifyUri);
+      if (!fromServer) playSpotifyTrack(track.spotifyUri);
     } else if (track?.preview) {
       previewTrack(track.preview);
     } else {
@@ -1909,13 +1960,21 @@
 
   // ── Réactions guests → visible sur HOST en temps réel ──
   socket.on('track:reaction', ({ guestName: reactorName, emoji, trackId }) => {
+    spawnReactionOnQueueRow(trackId, emoji);
     spawnHostEmoji(emoji, 4);
     addReactionPill(reactorName, emoji);
   });
 
   // ── Vote d'un guest → pulse Observatory node + feedback visuel ──
   socket.on('track:voted', ({ voterName, trackId }) => {
+    const myName = localStorage.getItem('zpeed_hostName') || 'Host';
+    if (voterName === myName) return;
     addReactionPill(voterName, '👍');
+    const vc = document.querySelector(`#queueList .queue-item[data-track-id="${trackId}"] .vote-count`);
+    if (vc) {
+      vc.classList.add('zpeed-pop');
+      setTimeout(() => vc.classList.remove('zpeed-pop'), 300);
+    }
     // Pulse the track node in the Observatory
     if (window.obs) {
       window.obs.pulse(trackId);
@@ -1982,17 +2041,111 @@
   }
 
   function updateMiniPlayer() {
-    const mp = document.getElementById('miniPlayer');
-    if (!currentTrack) { mp.classList.remove('visible'); return; }
-    mp.classList.add('visible');
-    document.getElementById('miniThumb').src         = currentTrack.thumbnail || '';
-    document.getElementById('miniTitle').textContent = currentTrack.title;
-    document.getElementById('miniSub').textContent   = currentTrack.channel;
-    // Mise à jour du ticker avec le vrai titre
+    // Sticky mini-player removed on host: keep only integrated player state sync.
+    if (!currentTrack) return;
     updateTicker(currentTrack.title, currentTrack.channel);
-    // Sync carousel + Apple Music bar
     carouselIndex = 0;
     renderCarousel();
+  }
+
+  function zpeedEscapeHtmlHost(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+  function zpeedHeatTierHost(votes, thNum) {
+    const mv = Math.max(0, votes | 0);
+    const th = Math.max(1, thNum || 1);
+    const ratio = mv / th;
+    if (ratio >= 1.15) return 'zpeed-heat-blaze';
+    if (ratio >= 0.75) return 'zpeed-heat-high';
+    if (ratio >= 0.35) return 'zpeed-heat-med';
+    return 'zpeed-heat-low';
+  }
+  function renderHostTop3() {
+    const wrap = document.getElementById('zpeedHostTop3');
+    if (!wrap) return;
+    const scores = {};
+    queue.forEach(t => {
+      const who = t.proposedBy || '?';
+      scores[who] = (scores[who] || 0) + Math.max(0, t.votes | 0);
+    });
+    const top = Object.entries(scores).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    if (!top.length) {
+      wrap.innerHTML = '';
+      return;
+    }
+    wrap.innerHTML =
+      '<div class="zpeed-top3">' +
+      top
+        .map(([n, s], i) => {
+          const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉';
+          return `<span class="zpeed-top3-pill">${medal} ${zpeedEscapeHtmlHost(n)} · ${s}</span>`;
+        })
+        .join('') +
+      '</div>';
+  }
+  function applyHostQueueClutch(oldSnap, newQueue) {
+    const th = roomMeta.voteThreshold != null ? Number(roomMeta.voteThreshold) : NaN;
+    const now = Date.now();
+    if (window.__zpeedStrongFxUntil && now < window.__zpeedStrongFxUntil) return;
+    newQueue.forEach(t => {
+      const el = document.getElementById('qrow-' + t.id);
+      if (!el) return;
+      const p = oldSnap[t.id];
+      const st = t.status || 'pending';
+      const v = t.votes | 0;
+      if (p && p.s === 'pending' && st === 'accepted') {
+        window.__zpeedStrongFxUntil = Date.now() + 700;
+        el.classList.add('queue-item--clutch', 'queue-item--validated-show');
+        setTimeout(() => el.classList.remove('queue-item--clutch', 'queue-item--validated-show'), 2600);
+      } else if (!Number.isNaN(th) && p && st === 'pending' && p.v < th && v >= th) {
+        window.__zpeedStrongFxUntil = Date.now() + 700;
+        el.classList.add('queue-item--clutch');
+        setTimeout(() => el.classList.remove('queue-item--clutch'), 850);
+      }
+    });
+  }
+  function spawnReactionOnQueueRow(trackId, emoji) {
+    const row = document.getElementById('qrow-' + trackId);
+    if (!row) return;
+    let layer = row.querySelector('.zpeed-react-layer');
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.className = 'zpeed-react-layer';
+      row.insertBefore(layer, row.firstChild);
+    }
+    const bubble = document.createElement('span');
+    bubble.className = 'zpeed-react-float';
+    bubble.textContent = emoji;
+    layer.appendChild(bubble);
+    setTimeout(() => bubble.remove(), 1200);
+  }
+
+  function hostVote(trackId, value, btn) {
+    if (hostVotedTracks.has(trackId)) return;
+    hostVotedTracks.add(trackId);
+    const hostName = localStorage.getItem('zpeed_hostName') || 'Host';
+    socket.emit('track:vote', {
+      code,
+      trackId,
+      hostId,
+      guestName: hostName,
+      userName: hostName,
+      vote: value
+    });
+    if (btn) {
+      btn.classList.add('btn-vote--pop');
+      setTimeout(() => btn.classList.remove('btn-vote--pop'), 280);
+      const row = document.querySelector(`#queueList .queue-item[data-track-id="${trackId}"] .vote-count`);
+      if (row) {
+        row.classList.add('zpeed-pop');
+        setTimeout(() => row.classList.remove('zpeed-pop'), 300);
+      }
+      btn.disabled = true; btn.style.opacity = '0.45';
+    }
   }
 
   function renderQueue() {
@@ -2003,6 +2156,9 @@
       return;
     }
     const maxVotes = Math.max(...queue.map(t => t.votes), 1);
+    const th = roomMeta.voteThreshold != null ? roomMeta.voteThreshold : 2;
+    const thNum = roomMeta.voteThreshold != null ? Number(roomMeta.voteThreshold) : NaN;
+    const hostVoterKey = 'host:' + hostId;
     el.innerHTML = queue.map((t, i) => {
       const pct    = Math.min(100, Math.max(4, (t.votes / maxVotes) * 100));
       const color  = pct < 30 ? '#00d4c8' : pct < 60 ? '#C97B2E' : pct < 85 ? '#E85D2A' : '#FF3B1F';
@@ -2012,22 +2168,41 @@
         `<img class="voter-av" src="${avatarUrl(n, 52)}" alt="${n}" title="${n}">`
       ).join('') + (voterList.length > 4 ? `<div class="voter-av-more">+${voterList.length - 4}</div>` : '');
       const heatIcon = t.votes >= 7 ? ' 🔥' : t.votes >= 4 ? ' ⚡' : '';
+      const st = t.status === 'accepted' ? '✓ Validé' : t.status === 'spotify_queued' ? 'Spotify' : t.status === 'pending' ? `Seuil ${th}` : '';
+      const votedByHost = (t.voters || []).includes(hostVoterKey);
+      const canHostVote = t.status === 'pending' && !votedByHost;
+      const voteBtns = canHostVote
+        ? `<div class="host-queue-votes" style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><button type="button" class="btn-vote" onclick="event.stopPropagation();hostVote('${t.id}',1,this)">👍</button><button type="button" class="btn-vote" onclick="event.stopPropagation();hostVote('${t.id}',-1,this)">👎</button></div>`
+        : '';
+      const stKey = t.status || 'pending';
+      const stClass = 'status-' + stKey;
+      const v = t.votes | 0;
+      const heatTier = !Number.isNaN(thNum) ? zpeedHeatTierHost(v, thNum) : 'zpeed-heat-low';
+      const momPct = !Number.isNaN(thNum) ? Math.min(100, Math.round((Math.max(0, v) / Math.max(thNum, 1)) * 100)) : 0;
+      const momRow =
+        !Number.isNaN(thNum)
+          ? `<div class="zpeed-momentum-row"><div class="zpeed-momentum"><div class="zpeed-momentum-fill" style="width:${momPct}%"></div></div><span class="zpeed-momentum-lbl">${Math.max(0, v)}/${thNum}</span></div>`
+          : '';
       return `
-        <div class="queue-item">
-          <div style="font-family:'Roboto', sans-serif;font-size:1rem;font-weight:700;color:var(--text2);min-width:20px">${i+1}</div>
-          <img class="queue-thumb" src="${t.thumbnail||''}" onerror="this.onerror=null;this.src=THUMB_FALLBACK">
+        <div class="queue-item track-card ${stClass} ${heatTier}" id="qrow-${t.id}" data-track-id="${t.id || ''}">
+          <div class="zpeed-react-layer" aria-hidden="true"></div>
+          <span class="zpeed-validated-tag">${VALIDATION_LABEL}</span>
+          <div class="host-q-idx" style="font-family:'Roboto', sans-serif;font-size:1rem;font-weight:700;color:var(--text2);min-width:24px;text-align:center;align-self:flex-start;padding-top:4px">${i+1}</div>
+          <img class="queue-thumb" src="${t.thumbnail||''}" onerror="this.onerror=null;this.src=THUMB_FALLBACK" alt="">
           <div class="queue-info" style="flex:1;min-width:0">
             <div class="queue-title">${t.title}</div>
-            <div class="queue-meta">${t.channel}</div>
+            <div class="queue-meta">${t.channel}${st ? ` · <span style="color:var(--purple-light);font-weight:600">${st}</span>` : ''}</div>
             <div class="queue-proposer">${t.proposedBy === '🎧 Host' ? '🎧 Host' : '🎤 ' + t.proposedBy}</div>
+            ${momRow}
             ${voters ? `<div class="voter-avatars">${voters}</div>` : ''}
+            ${voteBtns}
             <div class="heat-bar">
               <div class="heat-fill" style="width:${pct}%;background:${color};${pulse}"></div>
             </div>
           </div>
-          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;z-index:1">
+          <div class="queue-item--actions">
             <div class="vote-count" style="font-size:0.9rem">👍 ${t.votes}${heatIcon}</div>
-            <button class="btn btn-small btn-green" onclick="playTrack('${t.id}')">▶</button>
+            <button type="button" class="btn btn-small btn-green ui-btn-play" onclick="event.stopPropagation();playTrack('${t.id}')" aria-label="Lecture">▶</button>
           </div>
         </div>
       `;
@@ -2170,7 +2345,16 @@
       queue        = data.queue || [];
       currentTrack = data.currentTrack;
       guests       = data.guestList || [];
+      if (data.meta) {
+        roomMeta = { ...roomMeta, ...data.meta };
+        hostVotedTracks = new Set((queue || []).filter(t => (t.voters || []).includes('host:' + hostId)).map(t => t.id));
+        updateHostBanner();
+      }
       renderQueue();
+      renderHostTop3();
+      queue.forEach(t => {
+        prevTrackSnap[t.id] = { v: t.votes | 0, s: t.status || 'pending' };
+      });
       renderNowPlaying();
       updateMiniPlayer();
       // Populate Observatory with initial state
@@ -2252,7 +2436,20 @@
   }
 
   // ── Play / Pause toggle ─────────────────────────
-  function togglePlayPause() {
+  async function togglePlayPause() {
+    if (currentTrack?.spotifyUri) {
+      if (!window._spotifyPlayer || window._spotifyMockMode || window._spotifyRateLimited || !window._spotifyToken) {
+        markSpotifyUnavailable('Spotify temporarily unavailable');
+        return;
+      }
+      try {
+        await window._spotifyPlayer.togglePlay();
+        console.log('[spotify] togglePlay fired');
+      } catch (e) {
+        console.warn('[spotify] togglePlay failed:', e.message);
+      }
+      return;
+    }
     isPlaying = !isPlaying;
     const icon = document.getElementById('amPlayIcon');
     if (isPlaying) {
@@ -2264,6 +2461,21 @@
       icon.innerHTML = `<polygon points="5 3 19 12 5 21 5 3"/>`;
       stopProgressSim();
     }
+  }
+
+  function cycleSpotifyVolume() {
+    if (!window._spotifyPlayer || window._spotifyMockMode || window._spotifyRateLimited || !window._spotifyToken) {
+      markSpotifyUnavailable('Spotify temporarily unavailable');
+      return;
+    }
+    const presets = [0.2, 0.5, 0.8, 1];
+    const idx = presets.findIndex(v => Math.abs(v - window._spotifyVolume) < 0.05);
+    const next = presets[(idx + 1) % presets.length];
+    window._spotifyVolume = next;
+    window._spotifyPlayer.setVolume(next).then(() => {
+      console.log('[spotify] volume set:', Math.round(next * 100));
+      showToast(`🔊 Volume ${Math.round(next * 100)}%`);
+    }).catch(e => console.warn('[spotify] setVolume failed:', e.message));
   }
 
   function startProgressSim() {
@@ -2284,6 +2496,39 @@
   function stopProgressSim() {
     if (progressInterval) { clearInterval(progressInterval); progressInterval = null; }
   }
+
+  (function initZpeedIdleNudgeHost() {
+    let idleTimer;
+    const IDLE_MS = 12000;
+    function clearNudgeEls() {
+      document.body.classList.remove('zpeed-idle');
+      document.querySelectorAll('.zpeed-nudge-target').forEach(e => e.classList.remove('zpeed-nudge-target'));
+    }
+    function arm() {
+      clearTimeout(idleTimer);
+      clearNudgeEls();
+      idleTimer = setTimeout(() => {
+        document.body.classList.add('zpeed-idle');
+        const rows = [...document.querySelectorAll('#queueList .queue-item')];
+        const mostVoted = rows
+          .map(r => {
+            const id = r.getAttribute('data-track-id');
+            const t = id ? queue.find(qi => qi.id === id) : null;
+            return { r, v: t ? (t.votes | 0) : -Infinity };
+          })
+          .sort((a, b) => b.v - a.v)[0];
+        if (mostVoted && Number.isFinite(mostVoted.v)) {
+          mostVoted.r.classList.add('zpeed-nudge-target');
+          return;
+        }
+        const hi = document.getElementById('hostSearchInput');
+        if (hi) hi.classList.add('zpeed-nudge-target');
+      }, IDLE_MS);
+    }
+    ['pointerdown', 'keydown', 'touchstart', 'scroll'].forEach(ev =>
+      window.addEventListener(ev, arm, { passive: true }));
+    arm();
+  })();
 
   // Initial render (updates Am-Bar only — carousel replaced by Observatory)
   renderCarousel();
