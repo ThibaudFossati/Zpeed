@@ -3,3 +3,5 @@ node_modules
 sessions.json
 *.log
 .DS_Store
+private/
+docs/private/
