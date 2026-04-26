@@ -283,14 +283,42 @@ app.get('/api/auth/status', (req, res) => {
 // ─────────────────────────────────────────────
 // SPOTIFY OAUTH
 // ─────────────────────────────────────────────
-const SPOTIFY_REDIRECT = `${process.env.REDIRECT_BASE || 'http://127.0.0.1:3000'}/auth/spotify/callback`;
+/** Spotify callback URL: explicit SPOTIFY_REDIRECT_URI wins; else REDIRECT_BASE or Render public URL. */
+function resolveSpotifyRedirectUri() {
+  let explicit = (process.env.SPOTIFY_REDIRECT_URI || '').trim().replace(/\/$/, '');
+  if (explicit) {
+    if (explicit.endsWith('/auth/spotify/callback')) return explicit;
+    return `${explicit}/auth/spotify/callback`;
+  }
+  const base = (
+    process.env.REDIRECT_BASE ||
+    process.env.RENDER_EXTERNAL_URL ||
+    'http://127.0.0.1:3000'
+  )
+    .trim()
+    .replace(/\/$/, '');
+  return `${base}/auth/spotify/callback`;
+}
+
+const SPOTIFY_REDIRECT = resolveSpotifyRedirectUri();
+
+let spotifyOAuthFallbackMock = false;
+function useMockSpotify() {
+  return process.env.USE_MOCK_SPOTIFY === 'true' || spotifyOAuthFallbackMock;
+}
+
+function spotifyRedirectSource() {
+  if ((process.env.SPOTIFY_REDIRECT_URI || '').trim()) return 'SPOTIFY_REDIRECT_URI';
+  if ((process.env.REDIRECT_BASE || '').trim()) return 'REDIRECT_BASE';
+  if ((process.env.RENDER_EXTERNAL_URL || '').trim()) return 'RENDER_EXTERNAL_URL';
+  return 'default_localhost';
+}
 
 const spotifyApi = new SpotifyWebApi({
   clientId:     process.env.SPOTIFY_CLIENT_ID,
   clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
   redirectUri:  SPOTIFY_REDIRECT
 });
-const USE_MOCK_SPOTIFY = process.env.USE_MOCK_SPOTIFY === 'true';
 const SPOTIFY_SCOPES = [
   'user-read-private',
   'user-read-email',
@@ -304,9 +332,11 @@ const SPOTIFY_SCOPES = [
 app.get('/api/spotify/oauth-debug', (req, res) => {
   res.json({
     redirectUri: SPOTIFY_REDIRECT,
+    redirectSource: spotifyRedirectSource(),
     scopes: SPOTIFY_SCOPES,
     hasClientId: !!process.env.SPOTIFY_CLIENT_ID,
     hasClientSecret: !!process.env.SPOTIFY_CLIENT_SECRET,
+    deployCommit: process.env.RENDER_GIT_COMMIT || null,
     note: 'Allowlist/app mode must be verified in Spotify Developer Dashboard (Users and Access).'
   });
 });
@@ -406,10 +436,15 @@ app.get('/auth/spotify/callback', async (req, res) => {
 
     return res.redirect(`/host.html?code=${state}&platform=spotify`);
   } catch (err) {
-    const errMsg = err.response?.data
-      ? JSON.stringify(err.response.data)
-      : err.message;
-    console.error('Spotify callback FAILED:', errMsg);
+    spotifyOAuthFallbackMock = true;
+    console.log('[SPOTIFY] fallback to mock');
+    const status = err.response?.status;
+    const body = err.response?.data;
+    const safe =
+      body && typeof body === 'object'
+        ? { error: body.error, error_description: body.error_description }
+        : { message: err.message };
+    console.error('[SPOTIFY] OAuth callback failed', { status, ...safe });
     res.redirect('/host.html?error=spotify_failed');
   }
 });
@@ -427,7 +462,7 @@ app.get('/api/spotify/token', (req, res) => {
   res.json({
     access_token: s.hostSpotify.tokens.access_token,
     profile: s.hostSpotify.profile || null,
-    use_mock_spotify: USE_MOCK_SPOTIFY
+    use_mock_spotify: useMockSpotify()
   });
 });
 
@@ -1171,8 +1206,10 @@ function mapSpotifyItemsToTrackResults(items) {
 // ─── Spotify search (uses HOST's token, called by guests) ───
 app.get('/api/spotify/search', async (req, res) => {
   const { q, code } = req.query;
-  if (USE_MOCK_SPOTIFY) {
-    console.log('[MOCK_SPOTIFY] Using fallback search (env)');
+  if (useMockSpotify()) {
+    if (process.env.USE_MOCK_SPOTIFY === 'true') {
+      console.log('[SPOTIFY] search using mock (USE_MOCK_SPOTIFY=true)');
+    }
     return res.json(mapSpotifyItemsToTrackResults(getDevMockSpotifyItems(q)));
   }
   const s = sessions[code];
@@ -1217,7 +1254,7 @@ app.get('/api/spotify/search', async (req, res) => {
       return spotifyApiFailure(res, r.status, 'search.fetch');
     }
     if (r.status === 429) {
-      console.log('[MOCK_SPOTIFY] Using fallback search (429)');
+      console.log('[SPOTIFY] fallback to mock');
       return res.json(mapSpotifyItemsToTrackResults(getDevMockSpotifyItems(q)));
     }
     if (r.status !== 200) {
@@ -1244,7 +1281,7 @@ app.get('/api/spotify/search', async (req, res) => {
     res.json(mapSpotifyItemsToTrackResults(r.data.tracks.items));
   } catch(e) {
     spotifyDiag('spotify_search_exception', { code, query: q || '', error: e.response?.data || e.message });
-    console.log('[MOCK_SPOTIFY] Using fallback search (unreachable)');
+    console.log('[SPOTIFY] fallback to mock');
     return res.json(mapSpotifyItemsToTrackResults(getDevMockSpotifyItems(q)));
   }
 });
@@ -1305,4 +1342,15 @@ setInterval(() => {
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`\n🚀 ZPEED running on http://localhost:${PORT}`);
   console.log(`📱 Sur le réseau local : http://${LAN_IP}:${PORT}\n`);
+  console.log('[ZPEED] boot env (values hidden):', {
+    SPOTIFY_CLIENT_ID: !!process.env.SPOTIFY_CLIENT_ID,
+    SPOTIFY_CLIENT_SECRET: !!process.env.SPOTIFY_CLIENT_SECRET,
+    SPOTIFY_REDIRECT_URI_env: !!process.env.SPOTIFY_REDIRECT_URI,
+    REDIRECT_BASE: !!process.env.REDIRECT_BASE,
+    RENDER_EXTERNAL_URL: !!process.env.RENDER_EXTERNAL_URL,
+    RENDER_GIT_COMMIT: !!process.env.RENDER_GIT_COMMIT,
+    USE_MOCK_SPOTIFY: process.env.USE_MOCK_SPOTIFY === 'true',
+    spotifyRedirectSource: spotifyRedirectSource(),
+    spotifyCallbackUrl: SPOTIFY_REDIRECT
+  });
 });
