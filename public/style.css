@@ -956,7 +956,7 @@ body.zpeed-idle #queueList .queue-item.zpeed-nudge-target {
 
 /* ── QR WRAPPER ── */
 .qr-panel {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   text-align: center;
 }
 .qr-wrapper {
@@ -993,12 +993,36 @@ body.zpeed-idle #queueList .queue-item.zpeed-nudge-target {
   font-weight: 500;
 }
 .qr-link-preview {
-  margin-bottom: 10px;
+  margin-bottom: 0;
   font-size: 0.75rem;
   color: var(--text2);
   text-align: center;
   word-break: break-all;
   opacity: 0.9;
+}
+
+/* QR tab: primary actions (copy + share) — rhythm separate from destructive */
+.qr-actions-group {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  margin-top: 20px;
+}
+.qr-actions-group .btn {
+  width: 100%;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 10px 18px;
+  font-size: 0.94rem;
+}
+.qr-actions-group .btn + .btn {
+  margin-top: 11px;
+}
+@media (min-width: 769px) {
+  .qr-actions-group .btn {
+    min-height: 48px;
+  }
 }
 .qr-link-preview #qrLinkText {
   color: rgba(255,255,255,0.7);
@@ -1497,6 +1521,28 @@ body.zpeed-idle #queueList .queue-item.zpeed-nudge-target {
   -webkit-tap-highlight-color: transparent;
 }
 .end-btn:hover { background: rgba(239,68,68,0.06); }
+
+.terminate-session-btn {
+  margin-top: 28px;
+  opacity: 0.92;
+  align-self: stretch;
+  width: 100%;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 10px 22px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  border-color: rgba(239, 68, 68, 0.18);
+  color: rgba(248, 113, 113, 0.92);
+}
+.terminate-session-btn:hover {
+  background: rgba(239, 68, 68, 0.05);
+}
+@media (min-width: 769px) {
+  .terminate-session-btn {
+    min-height: 48px;
+  }
+}
 
 /* ── PROFIL STAT ── */
 .profil-stat {
