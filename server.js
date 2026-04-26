@@ -25,17 +25,8 @@ const { tickSpotifyPipeline, initSpotifyPipelineState } = require('./lib/spotify
 
 const SPOTIFY_PRECREATE_STATE = '__precreate__';
 
-function maskSpotifyToken(token) {
-  if (!token || typeof token !== 'string') return 'none';
-  if (token.length <= 10) return `${token.slice(0, 2)}***`;
-  return `${token.slice(0, 6)}...${token.slice(-4)}`;
-}
-
 function spotifyDiag(label, payload = {}) {
-  const out = { ...payload };
-  if (out.accessToken) out.accessToken = maskSpotifyToken(out.accessToken);
-  if (out.refreshToken) out.refreshToken = maskSpotifyToken(out.refreshToken);
-  console.log(`[SPOTIFY_DIAG] ${label}`, out);
+  console.log(`[SPOTIFY_DIAG] ${label}`, payload);
 }
 
 function spotifyApiFailure(res, status, stage, details = {}) {
@@ -334,7 +325,7 @@ app.get('/auth/spotify', (req, res) => {
 
 app.get('/auth/spotify/callback', async (req, res) => {
   const { code: authCode, state } = req.query;
-  console.log('Spotify callback hit — authCode:', authCode ? authCode.substring(0,20)+'...' : 'MISSING', '| state:', state);
+  console.log('[SPOTIFY] callback received');
   try {
     // ── Step 1: Exchange code for tokens ──────────────────────────────────────
     const tokenRes = await axios.post('https://accounts.spotify.com/api/token',
@@ -352,7 +343,7 @@ app.get('/auth/spotify/callback', async (req, res) => {
         }
       }
     );
-    console.log('Spotify token exchange SUCCESS:', tokenRes.status);
+    console.log(`[SPOTIFY] token exchange success (status: ${tokenRes.status})`);
     const { access_token, refresh_token, token_type, scope, expires_in } = tokenRes.data;
     spotifyDiag('oauth_token_exchange', {
       status: tokenRes.status,
@@ -360,9 +351,7 @@ app.get('/auth/spotify/callback', async (req, res) => {
       redirectUri: SPOTIFY_REDIRECT,
       tokenType: token_type || null,
       scope: scope || null,
-      expiresIn: expires_in || null,
-      accessToken: access_token,
-      refreshToken: refresh_token
+      expiresIn: expires_in || null
     });
 
     // ── Step 2: Fetch user profile (use a fresh per-request instance to avoid race conditions) ──
@@ -379,7 +368,7 @@ app.get('/auth/spotify/callback', async (req, res) => {
           picture: me.images?.[0]?.url || null,
           email: me.email || null
         };
-        console.log('Spotify profile fetched:', profile.name);
+        console.log(`[SPOTIFY] profile fetch status: ${meRes.status}`);
       } else {
         spotifyDiag('oauth_getme_non200', {
           status: meRes.status,
