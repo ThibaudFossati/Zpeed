@@ -1203,7 +1203,7 @@
   const qrDataUrl  = localStorage.getItem('zpeed_qr');
   const speakerNm  = localStorage.getItem('zpeed_hostName') || 'Session active';
 
-  if (!code || !hostId || !hostSecret) window.location.href = 'index.html';
+  if (!code || !hostId || !hostSecret) window.location.href = window.location.origin + '/index.html';
 
   const spotifyTokenUrl = () =>
     `/api/spotify/token?code=${encodeURIComponent(code)}&secret=${encodeURIComponent(hostSecret)}`;
@@ -1309,19 +1309,10 @@
   if (_elCodeSmall)   _elCodeSmall.textContent   = code;
   if (_elSpeaker)     _elSpeaker.textContent     = speakerNm;
 
-  // Use LAN IP so share links work from other phones on the same network
-  fetch('/api/config').then(r => r.json()).then(cfg => {
-    const base = `http://${cfg.lanIP}:${cfg.port}`;
-    const joinUrl = `${base}/?code=${code}`;
-    document.getElementById('shareLinkText').textContent = joinUrl;
-    document.getElementById('qrLinkText').textContent    = joinUrl;
-    window._joinUrl = joinUrl;
-  }).catch(() => {
-    const fallback = `${location.origin}/?code=${code}`;
-    document.getElementById('shareLinkText').textContent = fallback;
-    document.getElementById('qrLinkText').textContent    = fallback;
-    window._joinUrl = fallback;
-  });
+  const joinUrl = `${window.location.origin}/?code=${encodeURIComponent(code)}`;
+  document.getElementById('shareLinkText').textContent = joinUrl;
+  document.getElementById('qrLinkText').textContent    = joinUrl;
+  window._joinUrl = joinUrl;
 
   const socket = io();
   function joinRoom() { socket.emit('host:join', { code, hostId, hostSecret }); }
@@ -1366,7 +1357,7 @@
         showToast('Spotify temporairement indisponible');
         return;
       }
-      window.location.href = `/auth/spotify?sessionCode=${code}`;
+      window.location.href = `${window.location.origin}/auth/spotify?sessionCode=${encodeURIComponent(code)}`;
       return;
     }
   }
@@ -1421,7 +1412,7 @@
     if (window._spotifyRateLimited) return;
     // Redirect to server-side flow instead
     showToast('⚠️ Redirecting to Spotify...');
-    window.location.href = `/auth/spotify?sessionCode=${code}`;
+    window.location.href = `${window.location.origin}/auth/spotify?sessionCode=${encodeURIComponent(code)}`;
   }
 
   // Server-side OAuth handles token storage automatically via /auth/spotify/callback
@@ -2728,7 +2719,7 @@
       localStorage.setItem('zpeed_ended_code', code);
       localStorage.setItem('zpeed_ended_queue_count', queue.length);
       socket.emit('session:end', { code });
-      window.location.href = 'end.html';
+      window.location.href = window.location.origin + '/end.html';
     }
   }
 

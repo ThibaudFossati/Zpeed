@@ -25,17 +25,34 @@ const { tickSpotifyPipeline, initSpotifyPipelineState } = require('./lib/spotify
 
 const SPOTIFY_PRECREATE_STATE = '__precreate__';
 
+/** Room codes are stored uppercase; OAuth state must match. Precreate flag is case-insensitive. */
+function resolveSessionKey(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  if (s.toLowerCase() === SPOTIFY_PRECREATE_STATE) return SPOTIFY_PRECREATE_STATE;
+  return s.toUpperCase();
+}
+
 function spotifyDiag(label, payload = {}) {
   console.log(`[SPOTIFY_DIAG] ${label}`, payload);
 }
 
 function spotifyApiFailure(res, status, stage, details = {}) {
+  const clientMessage =
+    typeof details.clientMessage === 'string' && details.clientMessage.trim()
+      ? details.clientMessage.trim()
+      : null;
+  const apiError =
+    typeof details.apiError === 'string' && details.apiError.trim()
+      ? details.apiError.trim()
+      : null;
   const code =
-    status === 401
+    apiError ||
+    (status === 401
       ? 'spotify_unauthorized'
       : status === 403
       ? 'spotify_forbidden'
-      : 'spotify_api_error';
+      : 'spotify_api_error');
   let hint =
     status === 403
       ? 'Spotify Dashboard → Users and Access: add tester emails in Development mode.'
@@ -47,14 +64,24 @@ function spotifyApiFailure(res, status, stage, details = {}) {
   const mergedDetails =
     Object.keys(details).length || hint ? { ...details, ...(hint ? { hint } : {}) } : {};
   const message =
-    status === 401
+    clientMessage ||
+    (status === 401
       ? 'Spotify token expired or invalid. Reconnect Spotify.'
       : status === 403
       ? 'Spotify access denied. Check app access/allowlist/scopes.'
       : stage === 'search.fetch' && status >= 400 && status < 500
       ? 'Spotify search was rejected. Check token, scopes, and Dashboard settings.'
-      : 'Spotify request failed.';
+      : 'Spotify request failed.');
   return res.status(status || 502).json({ error: code, stage, message, details: mergedDetails });
+}
+
+function spotifyEnsureFailure(res, ensure, stage) {
+  const d = ensure.details;
+  return spotifyApiFailure(res, ensure.status || 401, stage, {
+    ...(d && typeof d === 'object' && !Array.isArray(d) ? d : {}),
+    ...(ensure.clientMessage ? { clientMessage: ensure.clientMessage } : {}),
+    ...(ensure.apiError ? { apiError: ensure.apiError } : {})
+  });
 }
 
 function hydrateSession(s) {
@@ -131,10 +158,17 @@ function getLanIP() {
 const LAN_IP = getLanIP();
 const PORT = process.env.PORT || 3000;
 
-/** Canonical browser origin for QR / share links (custom domain). Overrides RENDER_EXTERNAL_URL when set. */
+/** Canonical browser origin for QR / share links (fallback when request has no Host). */
 function resolvePublicBase() {
   const fromEnv =
-    (process.env.PUBLIC_APP_URL || process.env.ZPEED_PUBLIC_URL || '').trim().replace(/\/$/, '');
+    (
+      process.env.PUBLIC_APP_URL ||
+      process.env.PUBLIC_URL ||
+      process.env.ZPEED_PUBLIC_URL ||
+      ''
+    )
+      .trim()
+      .replace(/\/$/, '');
   if (fromEnv) return fromEnv;
   if (process.env.RENDER_EXTERNAL_URL) {
     return String(process.env.RENDER_EXTERNAL_URL).trim().replace(/\/$/, '');
@@ -144,12 +178,29 @@ function resolvePublicBase() {
 
 function publicBaseSource() {
   if ((process.env.PUBLIC_APP_URL || '').trim()) return 'PUBLIC_APP_URL';
+  if ((process.env.PUBLIC_URL || '').trim()) return 'PUBLIC_URL';
   if ((process.env.ZPEED_PUBLIC_URL || '').trim()) return 'ZPEED_PUBLIC_URL';
   if ((process.env.RENDER_EXTERNAL_URL || '').trim()) return 'RENDER_EXTERNAL_URL';
   return 'lan_ip';
 }
 
 const PUBLIC_BASE = resolvePublicBase();
+
+/** Prefer the URL the user actually hit (custom domain behind proxy). */
+function getRequestPublicBase(req) {
+  if (!req || !req.headers) return PUBLIC_BASE;
+  const fwd = (req.headers['x-forwarded-host'] || '').split(',')[0].trim();
+  const host = fwd || req.headers.host || '';
+  if (!host) return PUBLIC_BASE;
+  let proto = (req.headers['x-forwarded-proto'] || '').split(',')[0].trim();
+  if (!proto) {
+    proto = req.secure ? 'https' : 'http';
+  }
+  if ((host.startsWith('localhost') || host.startsWith('127.')) && proto === 'https') {
+    proto = 'http';
+  }
+  return `${proto}://${host}`.replace(/\/$/, '');
+}
 
 const app = express();
 app.set('trust proxy', 1);
@@ -168,7 +219,17 @@ app.use(session({
 // ─────────────────────────────────────────────
 // GOOGLE OAUTH
 // ─────────────────────────────────────────────
-const REDIRECT_BASE = process.env.REDIRECT_BASE || 'http://127.0.0.1:3000';
+const REDIRECT_BASE =
+  (
+    process.env.PUBLIC_URL ||
+    process.env.PUBLIC_APP_URL ||
+    process.env.ZPEED_PUBLIC_URL ||
+    process.env.REDIRECT_BASE ||
+    process.env.RENDER_EXTERNAL_URL ||
+    ''
+  )
+    .trim()
+    .replace(/\/$/, '') || 'http://127.0.0.1:3000';
 
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
@@ -296,7 +357,7 @@ app.get('/api/youtube/playlist/:id', async (req, res) => {
 // ─── AUTH STATUS (toutes les plateformes) ───
 app.get('/api/auth/status', (req, res) => {
   const { code } = req.query;
-  const s = sessions[code];
+  const s = sessions[resolveSessionKey(code)];
   if (!s) return res.json({ platforms: {} });
   res.json({
     platforms: {
@@ -312,7 +373,7 @@ app.get('/api/auth/status', (req, res) => {
 // ─────────────────────────────────────────────
 // SPOTIFY OAUTH
 // ─────────────────────────────────────────────
-/** Spotify callback URL: explicit SPOTIFY_REDIRECT_URI wins; else PUBLIC_APP_URL / REDIRECT_BASE / Render URL. */
+/** Spotify callback URL: explicit SPOTIFY_REDIRECT_URI wins; else PUBLIC_APP_URL / PUBLIC_URL / ZPEED_PUBLIC_URL / REDIRECT_BASE / Render. */
 function resolveSpotifyRedirectUri() {
   let explicit = (process.env.SPOTIFY_REDIRECT_URI || '').trim().replace(/\/$/, '');
   if (explicit) {
@@ -320,7 +381,14 @@ function resolveSpotifyRedirectUri() {
     return `${explicit}/auth/spotify/callback`;
   }
   const base = (
-    (process.env.PUBLIC_APP_URL || process.env.ZPEED_PUBLIC_URL || '').trim().replace(/\/$/, '') ||
+    (
+      process.env.PUBLIC_APP_URL ||
+      process.env.PUBLIC_URL ||
+      process.env.ZPEED_PUBLIC_URL ||
+      ''
+    )
+      .trim()
+      .replace(/\/$/, '') ||
     (process.env.REDIRECT_BASE || '').trim().replace(/\/$/, '') ||
     (process.env.RENDER_EXTERNAL_URL || '').trim().replace(/\/$/, '') ||
     'http://127.0.0.1:3000'
@@ -337,6 +405,7 @@ function useMockSpotify() {
 function spotifyRedirectSource() {
   if ((process.env.SPOTIFY_REDIRECT_URI || '').trim()) return 'SPOTIFY_REDIRECT_URI';
   if ((process.env.PUBLIC_APP_URL || '').trim()) return 'PUBLIC_APP_URL';
+  if ((process.env.PUBLIC_URL || '').trim()) return 'PUBLIC_URL';
   if ((process.env.ZPEED_PUBLIC_URL || '').trim()) return 'ZPEED_PUBLIC_URL';
   if ((process.env.REDIRECT_BASE || '').trim()) return 'REDIRECT_BASE';
   if ((process.env.RENDER_EXTERNAL_URL || '').trim()) return 'RENDER_EXTERNAL_URL';
@@ -362,7 +431,8 @@ app.get('/api/spotify/oauth-debug', (req, res) => {
   res.json({
     redirectUri: SPOTIFY_REDIRECT,
     redirectSource: spotifyRedirectSource(),
-    publicBase: PUBLIC_BASE,
+    publicBase: getRequestPublicBase(req),
+    publicBaseEnvFallback: PUBLIC_BASE,
     publicBaseSource: publicBaseSource(),
     scopes: SPOTIFY_SCOPES,
     clientIdPresent: !!process.env.SPOTIFY_CLIENT_ID,
@@ -376,19 +446,21 @@ app.get('/api/spotify/oauth-debug', (req, res) => {
       process.env.VERCEL_GIT_COMMIT_SHA ||
       null,
     note:
-      'Spotify Dashboard → Redirect URIs must include redirectUri above. For custom domains set PUBLIC_APP_URL or SPOTIFY_REDIRECT_URI on Render.'
+      'Spotify Dashboard → Redirect URIs must include redirectUri above. For custom domains set PUBLIC_URL, PUBLIC_APP_URL, or SPOTIFY_REDIRECT_URI to https://your-domain (and add the callback URL in the Dashboard).'
   });
 });
 
 app.get('/auth/spotify', (req, res) => {
   const { sessionCode } = req.query;
   const scopes = SPOTIFY_SCOPES;
+  const state = sessionCode ? resolveSessionKey(sessionCode) : '';
   spotifyDiag('oauth_authorize_redirect', {
     sessionCode: sessionCode || null,
+    oauthState: state || null,
     redirectUri: SPOTIFY_REDIRECT,
     scopes
   });
-  const url = spotifyApi.createAuthorizeURL(scopes, sessionCode || '');
+  const url = spotifyApi.createAuthorizeURL(scopes, state);
   res.redirect(url);
 });
 
@@ -459,21 +531,43 @@ app.get('/auth/spotify/callback', async (req, res) => {
     }
 
     // ── Pré-connexion (avant création de room) ─────────────────────────────────
-    if (state === SPOTIFY_PRECREATE_STATE) {
-      req.session.pendingHostSpotify = { tokens: { access_token, refresh_token }, profile };
+    if (state && String(state).trim().toLowerCase() === SPOTIFY_PRECREATE_STATE) {
+      const prev = req.session.pendingHostSpotify?.tokens || {};
+      req.session.pendingHostSpotify = {
+        tokens: {
+          access_token,
+          refresh_token: refresh_token || prev.refresh_token || undefined
+        },
+        profile
+      };
       return res.redirect('/index.html?spotify_ready=1');
     }
 
-    // ── Step 3: Store in session if it exists ─────────────────────────────────
-    if (state && sessions[state]) {
-      sessions[state].hostSpotify = { tokens: { access_token, refresh_token }, profile };
+    // ── Step 3: Store in session if it exists (state normalized to room key) ──
+    const stateKey = resolveSessionKey(state);
+    if (stateKey && sessions[stateKey]) {
+      const prev = sessions[stateKey].hostSpotify?.tokens || {};
+      sessions[stateKey].hostSpotify = {
+        tokens: {
+          access_token,
+          refresh_token: refresh_token || prev.refresh_token || undefined
+        },
+        profile
+      };
       saveSessions();
-      console.log('Spotify stored in session:', state);
+      console.log('Spotify stored in session:', stateKey);
     } else {
-      console.warn('No session found for state:', state, '— token will not be persisted server-side');
+      console.warn(
+        'No session found for OAuth state:',
+        state,
+        'resolved:',
+        stateKey || '(empty)',
+        '— token will not be persisted server-side'
+      );
     }
 
-    return res.redirect(`/host.html?code=${state}&platform=spotify`);
+    const redirectCode = encodeURIComponent(stateKey || String(state || '').trim());
+    return res.redirect(`/host.html?code=${redirectCode}&platform=spotify`);
   } catch (err) {
     const status = err.response?.status;
     const body = err.response?.data;
@@ -495,7 +589,7 @@ app.get('/auth/spotify/callback', async (req, res) => {
 // ── Return stored Spotify token to host client (Web Playback SDK) — requires hostSecret ──
 app.get('/api/spotify/token', (req, res) => {
   const { code, secret } = req.query;
-  const s = sessions[code];
+  const s = sessions[resolveSessionKey(code)];
   if (!secret || s?.hostSecret !== secret) {
     return res.status(403).json({ error: 'Forbidden' });
   }
@@ -511,13 +605,15 @@ app.get('/api/spotify/token', (req, res) => {
 
 app.get('/api/spotify/playlists', async (req, res) => {
   const { code } = req.query;
-  const s = sessions[code];
+  const roomKey = resolveSessionKey(code);
+  const s = sessions[roomKey];
   if (!s?.hostSpotify?.tokens) return res.status(401).json({ error: 'Not connected' });
   const ensure = await ensureSpotifyAccessToken(s, process.env);
   if (!ensure.ok) {
-    spotifyDiag('spotify_playlists_token_invalid', { code, error: ensure.error });
-    return spotifyApiFailure(res, 401, 'playlists.ensure_token');
+    spotifyDiag('spotify_playlists_token_invalid', { code: roomKey, error: ensure.error });
+    return spotifyEnsureFailure(res, ensure, 'playlists.ensure_token');
   }
+  if (ensure.refreshed) saveSessions();
   spotifyApi.setAccessToken(s.hostSpotify.tokens.access_token);
   try {
     const data = await spotifyApi.getUserPlaylists({ limit: 20 });
@@ -529,7 +625,7 @@ app.get('/api/spotify/playlists', async (req, res) => {
   } catch (e) {
     const status = e.statusCode || e.status || e.response?.statusCode || 502;
     spotifyDiag('spotify_playlists_failed', {
-      code,
+      code: roomKey,
       status,
       error: e.body || e.message
     });
@@ -539,13 +635,19 @@ app.get('/api/spotify/playlists', async (req, res) => {
 
 app.get('/api/spotify/playlist/:id', async (req, res) => {
   const { code } = req.query;
-  const s = sessions[code];
+  const roomKey = resolveSessionKey(code);
+  const s = sessions[roomKey];
   if (!s?.hostSpotify?.tokens) return res.status(401).json({ error: 'Not connected' });
   const ensure = await ensureSpotifyAccessToken(s, process.env);
   if (!ensure.ok) {
-    spotifyDiag('spotify_playlist_tracks_token_invalid', { code, playlistId: req.params.id, error: ensure.error });
-    return spotifyApiFailure(res, 401, 'playlist_tracks.ensure_token');
+    spotifyDiag('spotify_playlist_tracks_token_invalid', {
+      code: roomKey,
+      playlistId: req.params.id,
+      error: ensure.error
+    });
+    return spotifyEnsureFailure(res, ensure, 'playlist_tracks.ensure_token');
   }
+  if (ensure.refreshed) saveSessions();
   spotifyApi.setAccessToken(s.hostSpotify.tokens.access_token);
   try {
     const data = await spotifyApi.getPlaylistTracks(req.params.id, { limit: 50 });
@@ -565,7 +667,7 @@ app.get('/api/spotify/playlist/:id', async (req, res) => {
   } catch (e) {
     const status = e.statusCode || e.status || e.response?.statusCode || 502;
     spotifyDiag('spotify_playlist_tracks_failed', {
-      code,
+      code: roomKey,
       playlistId: req.params.id,
       status,
       error: e.body || e.message
@@ -794,7 +896,8 @@ app.post('/api/speaker/connect', async (req, res) => {
   // Lier l'enceinte à cette session
   speakerSessions[key] = code;
 
-  const joinUrl = `${PUBLIC_BASE}/?speaker=${encodeURIComponent(speakerName)}&speakerId=${encodeURIComponent(key)}`;
+  const base = getRequestPublicBase(req);
+  const joinUrl = `${base}/?speaker=${encodeURIComponent(speakerName)}&speakerId=${encodeURIComponent(key)}`;
   const qrDataUrl = await QRCode.toDataURL(joinUrl, {
     color: { dark: '#7B52D4', light: '#1a1a1a' },
     width: 300, margin: 2
@@ -806,6 +909,7 @@ app.post('/api/speaker/connect', async (req, res) => {
     hostId,
     hostSecret,
     qrDataUrl,
+    joinUrl,
     speakerName,
     message: `Tu es le HOST de cette session`
   });
@@ -854,7 +958,8 @@ app.post('/api/session/create', async (req, res) => {
   delete req.session.pendingHostSpotify;
   saveSessions();
 
-  const joinUrl = `${PUBLIC_BASE}/?code=${code}`;
+  const base = getRequestPublicBase(req);
+  const joinUrl = `${base}/?code=${code}`;
   const qrDataUrl = await QRCode.toDataURL(joinUrl, {
     color: { dark: '#7B52D4', light: '#1a1a1a' },
     width: 300, margin: 2
@@ -1255,19 +1360,38 @@ app.get('/api/spotify/search', async (req, res) => {
     }
     return res.json(mapSpotifyItemsToTrackResults(getDevMockSpotifyItems(q)));
   }
-  const s = sessions[code];
-  if (!s?.hostSpotify?.tokens) return res.status(401).json({ error: 'Not connected' });
+  const roomKey = resolveSessionKey(code);
+  if (!roomKey) {
+    return res.status(400).json({
+      error: 'bad_request',
+      message: 'Missing or invalid session code.'
+    });
+  }
+  const s = sessions[roomKey];
+  if (!s) {
+    return res.status(404).json({
+      error: 'session_not_found',
+      message: 'Unknown session code.'
+    });
+  }
+  if (!s.hostSpotify?.tokens) {
+    return res.status(401).json({
+      error: 'spotify_not_connected',
+      message: 'Host has not connected Spotify for this room.'
+    });
+  }
   const ensure = await ensureSpotifyAccessToken(s, process.env);
   if (!ensure.ok) {
     spotifyDiag('spotify_search_token_invalid', {
-      code,
+      code: roomKey,
       query: q || '',
       status: ensure.status || 401,
       error: ensure.error,
       details: ensure.details || null
     });
-    return spotifyApiFailure(res, ensure.status || 401, 'search.ensure_token', ensure.details || {});
+    return spotifyEnsureFailure(res, ensure, 'search.ensure_token');
   }
+  if (ensure.refreshed) saveSessions();
   try {
     const query = String(q || '');
     const shouldVerboseLog =
@@ -1281,7 +1405,7 @@ app.get('/api/spotify/search', async (req, res) => {
     );
     if (shouldVerboseLog) {
       spotifyDiag('spotify_search_raw_response', {
-        code,
+        code: roomKey,
         query,
         status: r.status,
         rawResponse: r.data
@@ -1289,7 +1413,7 @@ app.get('/api/spotify/search', async (req, res) => {
     }
     if (r.status === 401 || r.status === 403) {
       spotifyDiag('spotify_search_auth_error', {
-        code,
+        code: roomKey,
         status: r.status,
         query: q || '',
         responseError: r.data?.error || null
@@ -1305,7 +1429,7 @@ app.get('/api/spotify/search', async (req, res) => {
     }
     if (r.status !== 200) {
       spotifyDiag('spotify_search_non200', {
-        code,
+        code: roomKey,
         status: r.status,
         query: q || '',
         spotifyError: r.data?.error || null
@@ -1317,7 +1441,7 @@ app.get('/api/spotify/search', async (req, res) => {
     }
     if (!Array.isArray(r.data?.tracks?.items)) {
       spotifyDiag('spotify_search_unexpected_shape', {
-        code,
+        code: roomKey,
         query,
         status: r.status,
         rawResponse: r.data
@@ -1326,7 +1450,7 @@ app.get('/api/spotify/search', async (req, res) => {
     }
     if (r.data.tracks.items.length === 0) {
       spotifyDiag('spotify_search_empty', {
-        code,
+        code: roomKey,
         query,
         status: r.status,
         rawResponse: r.data
@@ -1334,7 +1458,11 @@ app.get('/api/spotify/search', async (req, res) => {
     }
     res.json(mapSpotifyItemsToTrackResults(r.data.tracks.items));
   } catch(e) {
-    spotifyDiag('spotify_search_exception', { code, query: q || '', error: e.response?.data || e.message });
+    spotifyDiag('spotify_search_exception', {
+      code: roomKey,
+      query: q || '',
+      error: e.response?.data || e.message
+    });
     console.log('[SPOTIFY] fallback to mock');
     return res.json(mapSpotifyItemsToTrackResults(getDevMockSpotifyItems(q)));
   }
@@ -1354,7 +1482,8 @@ app.get('/api/config', (req, res) => {
   res.json({
     lanIP: LAN_IP,
     port: PORT,
-    publicBase: PUBLIC_BASE,
+    publicBase: getRequestPublicBase(req),
+    publicBaseFallback: PUBLIC_BASE,
     publicBaseSource: publicBaseSource()
   });
 });
@@ -1406,6 +1535,7 @@ server.listen(PORT, '0.0.0.0', () => {
     SPOTIFY_CLIENT_SECRET: !!process.env.SPOTIFY_CLIENT_SECRET,
     SPOTIFY_REDIRECT_URI_env: !!process.env.SPOTIFY_REDIRECT_URI,
     PUBLIC_APP_URL: !!process.env.PUBLIC_APP_URL,
+    PUBLIC_URL: !!process.env.PUBLIC_URL,
     ZPEED_PUBLIC_URL: !!process.env.ZPEED_PUBLIC_URL,
     REDIRECT_BASE: !!process.env.REDIRECT_BASE,
     RENDER_EXTERNAL_URL: !!process.env.RENDER_EXTERNAL_URL,

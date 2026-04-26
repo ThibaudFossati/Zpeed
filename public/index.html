@@ -9,9 +9,6 @@
     .step { display: none; }
     .step.active { display: flex; flex-direction: column; gap: 18px; align-items: stretch; flex: 1; justify-content: center; }
 
-    /* Toast sur index = pas de mini-player en bas */
-    #toast { bottom: 40px !important; }
-
     .hero-sub {
       text-align: center; font-size: 0.95rem; color: var(--text2); font-weight: 400;
     }
@@ -111,6 +108,109 @@
       padding: 20px 32px;
       display: inline-block;
     }
+
+    /* Spotify prerequisite — above host card; flat, no shadows */
+    .spotify-precreate-wrap {
+      width: 100%;
+      max-width: 340px;
+      margin: 0 auto 18px;
+    }
+    .spotify-precreate-wrap.is-connected {
+      margin-bottom: 14px;
+    }
+    .spotify-prereq-card {
+      text-align: center;
+      padding: 18px 16px 16px;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(12, 14, 18, 0.55);
+      box-shadow: none;
+    }
+    .spotify-prereq-title {
+      margin: 0 0 6px;
+      font-family: 'Roboto', sans-serif;
+      font-size: 1.08rem;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      color: var(--text);
+    }
+    .spotify-prereq-sub {
+      margin: 0 0 16px;
+      font-size: 0.8rem;
+      font-weight: 400;
+      line-height: 1.45;
+      color: var(--text2);
+    }
+    .spotify-prereq-cta { margin-top: 0; }
+    .spotify-prereq-hint {
+      margin: 10px 0 0;
+      padding: 0 4px;
+      font-size: 0.68rem;
+      line-height: 1.45;
+      color: var(--text2);
+      opacity: 0.7;
+      text-align: center;
+      font-weight: 400;
+    }
+
+    .spotify-status-strip {
+      display: none;
+      justify-content: center;
+      text-align: center;
+    }
+    .spotify-precreate-wrap.is-connected .spotify-status-strip {
+      display: flex;
+    }
+    .spotify-status-strip-inner {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 5px 6px;
+      max-width: 100%;
+      padding: 6px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(34, 197, 94, 0.22);
+      background: rgba(34, 197, 94, 0.06);
+    }
+    .spotify-status-dot {
+      font-size: 0.72rem;
+      font-weight: 800;
+      color: #4ade80;
+      line-height: 1;
+    }
+    .spotify-status-main {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: rgba(167, 243, 208, 0.95);
+      letter-spacing: 0.02em;
+    }
+    .spotify-status-sep {
+      font-size: 0.65rem;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.2);
+      user-select: none;
+    }
+    .spotify-status-sub {
+      font-size: 0.68rem;
+      font-weight: 400;
+      color: var(--text2);
+    }
+
+    .role-card.host-card.role-card--needs-spotify {
+      opacity: 0.46;
+      pointer-events: none;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+    .role-card.host-card.role-card--needs-spotify:hover,
+    .role-card.host-card.role-card--needs-spotify:active {
+      background: rgba(16, 185, 129, 0.06);
+      transform: none !important;
+    }
+    .role-card.host-card.role-card--needs-spotify .role-desc {
+      color: var(--text2);
+    }
   </style>
   <script src="bg.js"></script>
   <script src="notif.js"></script>
@@ -152,16 +252,29 @@
       </div>
     </div>
 
-    <!-- Créer une soirée -->
-    <div class="role-card host-card" onclick="createSession()">
+    <!-- Spotify = premier prérequis host (au-dessus de la carte soirée) -->
+    <div class="spotify-precreate-wrap" id="spotifyPrecreateZone">
+      <div id="spotifyPrecreateDisconnected" class="spotify-prereq-card">
+        <h3 class="spotify-prereq-title">Connecte Spotify</h3>
+        <p class="spotify-prereq-sub">Requis pour créer une soirée</p>
+        <button type="button" class="btn btn-spotify btn-block spotify-prereq-cta" id="btnSpotifyPrecreateConnect" onclick="connectSpotifyPrecreate()">Continuer avec Spotify</button>
+        <p class="spotify-prereq-hint">Tu seras redirigé vers Spotify puis reviendras automatiquement</p>
+      </div>
+      <div id="spotifyPrecreateConnected" class="spotify-status-strip" aria-live="polite">
+        <div class="spotify-status-strip-inner">
+          <span class="spotify-status-dot">✓</span>
+          <span class="spotify-status-main">Spotify connecté</span>
+          <span class="spotify-status-sep" aria-hidden="true">·</span>
+          <span class="spotify-status-sub">Tu peux créer une soirée</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Créer une soirée (cliquable seulement si Spotify OK) -->
+    <div class="role-card host-card" id="hostCreateCard" role="button" onclick="createSession()">
       <div class="role-icon">🎧</div>
       <div class="role-name">Crée une soirée</div>
       <div class="role-desc">Tu deviens HOST · Tu gères la queue<br>et l'enceinte depuis ton téléphone</div>
-    </div>
-
-    <div style="width:100%;max-width:340px;margin:0 auto 14px;padding:12px 14px;border-radius:14px;border:1px solid rgba(30,215,96,0.22);background:rgba(30,215,96,0.06);font-size:0.78rem;color:var(--text2);line-height:1.45">
-      <strong style="color:#1ED760">Spotify requis</strong> pour créer une soirée. Connecte-toi une fois, puis crée ta session.
-      <button type="button" class="btn btn-spotify btn-block" style="margin-top:10px" onclick="connectSpotifyPrecreate()">🎵 Connecter Spotify</button>
     </div>
 
     <div class="divider">ou</div>
@@ -195,21 +308,67 @@
 
 </div>
 
-<div id="toast"></div>
-
 <script>
+  const LS_SPOTIFY_CONNECTED = 'spotify_connected';
+  const LS_DISPLAY_NAME = 'zpeed_display_name';
+
   let userName = '';
   let sessionData = null;
 
+  function isSpotifyConnected() {
+    return localStorage.getItem(LS_SPOTIFY_CONNECTED) === 'true';
+  }
+
+  function setSpotifyConnected(value) {
+    if (value) localStorage.setItem(LS_SPOTIFY_CONNECTED, 'true');
+    else localStorage.removeItem(LS_SPOTIFY_CONNECTED);
+    refreshSpotifyPrecreateUi();
+  }
+
+  function readSavedDisplayName() {
+    try {
+      return (localStorage.getItem(LS_DISPLAY_NAME) || '').trim();
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function persistDisplayNameToStorage(name) {
+    const n = (name || '').trim();
+    if (!n) return;
+    try {
+      localStorage.setItem(LS_DISPLAY_NAME, n);
+    } catch (e) {}
+  }
+
+  /** Garde input + variable alignés avec le stockage (retour OAuth, Retour étape 1). */
+  function applyDisplayNameEverywhere(name) {
+    const n = (name || '').trim();
+    const input = document.getElementById('userName');
+    const nd = document.getElementById('nameDisplay');
+    if (n) {
+      userName = n;
+      if (input) input.value = n;
+      if (nd) nd.textContent = n;
+      persistDisplayNameToStorage(n);
+    }
+  }
+
   function goToStep1() {
+    const input = document.getElementById('userName');
+    const v = (userName || readSavedDisplayName() || (input && input.value.trim()) || '').trim();
+    if (input && v) input.value = v;
+    if (v) userName = v;
     setStep('step1');
   }
 
   function goToStep2() {
     userName = document.getElementById('userName').value.trim();
     if (!userName) { showToast('⚠️ Entre ton prénom'); return; }
+    persistDisplayNameToStorage(userName);
     document.getElementById('nameDisplay').textContent = userName;
     setStep('step2');
+    refreshSpotifyPrecreateUi();
 
     // Si URL avec ?code= (QR scanné) → remplir les boxes automatiquement
     const urlParams = new URLSearchParams(window.location.search);
@@ -272,16 +431,73 @@
   }
   document.addEventListener('DOMContentLoaded', initCodeBoxes);
 
+  function cleanIndexUrl() {
+    const u = new URL(window.location.href);
+    u.search = '';
+    history.replaceState({}, '', u.pathname + u.hash);
+  }
+
+  /** Étape 2 : Spotify en premier, carte host désactivée tant que non connecté. */
+  function refreshSpotifyPrecreateUi() {
+    const zone = document.getElementById('spotifyPrecreateZone');
+    const disconnected = document.getElementById('spotifyPrecreateDisconnected');
+    const connected = document.getElementById('spotifyPrecreateConnected');
+    const hostCard = document.getElementById('hostCreateCard');
+    if (!zone || !disconnected || !connected || !hostCard) return;
+
+    const ok = isSpotifyConnected();
+    zone.classList.toggle('is-connected', ok);
+    disconnected.style.display = ok ? 'none' : 'block';
+
+    hostCard.classList.toggle('role-card--needs-spotify', !ok);
+    if (ok) {
+      hostCard.removeAttribute('aria-disabled');
+      hostCard.removeAttribute('tabindex');
+    } else {
+      hostCard.setAttribute('aria-disabled', 'true');
+      hostCard.setAttribute('tabindex', '-1');
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
+    const nameInput = document.getElementById('userName');
+    const saved = readSavedDisplayName();
+    if (saved && nameInput && !nameInput.value.trim()) nameInput.value = saved;
+
     const p = new URLSearchParams(window.location.search);
-    if (p.get('spotify_ready') === '1') {
-      showToast('✅ Spotify connecté ! Tu peux créer ta soirée.');
-      history.replaceState({}, '', 'index.html');
+    const spotifyReady = p.get('spotify_ready') === '1';
+    const urlCodeFromQuery = p.get('code');
+
+    if (spotifyReady) {
+      setSpotifyConnected(true);
+      const nameAfter =
+        saved ||
+        (nameInput && nameInput.value.trim()) ||
+        (userName && userName.trim()) ||
+        '';
+      if (nameAfter) {
+        applyDisplayNameEverywhere(nameAfter);
+        setStep('step2');
+        refreshSpotifyPrecreateUi();
+        if (urlCodeFromQuery) fillCodeBoxes(urlCodeFromQuery.toUpperCase());
+      }
+      showToast('Spotify connecté avec succès', 2200);
+      cleanIndexUrl();
+    } else if (isSpotifyConnected() && saved) {
+      /* Rechargement / retour sans ?spotify_ready : ne pas repasser par l’étape prénom */
+      applyDisplayNameEverywhere(saved);
+      setStep('step2');
+      refreshSpotifyPrecreateUi();
+    } else {
+      refreshSpotifyPrecreateUi();
     }
   });
 
   function connectSpotifyPrecreate() {
-    window.location.href = '/auth/spotify?sessionCode=__precreate__';
+    const fromInput = document.getElementById('userName')?.value.trim() || '';
+    const merged = (userName && userName.trim()) || fromInput || readSavedDisplayName();
+    if (merged) applyDisplayNameEverywhere(merged);
+    window.location.href = window.location.origin + '/auth/spotify?sessionCode=__precreate__';
   }
 
   function setStep(id) {
@@ -291,6 +507,10 @@
 
   // ─── CRÉER UNE SESSION (HOST) ───
   async function createSession() {
+    if (!isSpotifyConnected()) {
+      showToast('🎵 Connecte Spotify en haut de la page avant de créer une soirée.');
+      return;
+    }
     showToast('⏳ Création de la session...');
     try {
       const res = await fetch('/api/session/create', {
@@ -301,8 +521,8 @@
       });
       const data = await res.json();
       if (res.status === 403 && data.needSpotify) {
-        showToast('🎵 Connecte Spotify d’abord');
-        connectSpotifyPrecreate();
+        setSpotifyConnected(false);
+        showToast('🎵 Session Spotify expirée — reconnecte-toi.');
         return;
       }
       if (!data.success) { showToast('❌ Erreur serveur'); return; }
@@ -395,16 +615,25 @@
   function enterApp() {
     if (!sessionData) return;
     if (sessionData.role === 'host') {
-      window.location.href = 'host.html';
+      window.location.href = window.location.origin + '/host.html';
     } else {
-      window.location.href = `guest.html?code=${sessionData.code}`;
+      window.location.href = `${window.location.origin}/guest.html?code=${encodeURIComponent(sessionData.code)}`;
     }
   }
 
-  function showToast(msg) {
+  function showToast(msg, durationMs) {
+    const ms = typeof durationMs === 'number' ? durationMs : 3800;
+    if (typeof window.showNotif === 'function') {
+      const success = /succès|^✅/i.test(msg);
+      window.showNotif({ title: msg, duration: ms, type: success ? 'success' : '' });
+      return;
+    }
     const t = document.getElementById('toast');
-    t.textContent = msg; t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3000);
+    if (!t) return;
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(window._zpeedToastTimer);
+    window._zpeedToastTimer = setTimeout(() => t.classList.remove('show'), ms);
   }
 
 </script>

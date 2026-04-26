@@ -398,7 +398,9 @@
   const guestName  = localStorage.getItem('zpeed_guestName') || 'Guest';
   const hostName   = localStorage.getItem('zpeed_hostName') || 'Host';
 
-  if (!code || !guestId) window.location.href = 'index.html?code=' + (code || '');
+  if (!code || !guestId) {
+    window.location.href = window.location.origin + '/index.html?code=' + encodeURIComponent(code || '');
+  }
 
   // Fill UI
   document.getElementById('codeDisplay').textContent   = code;
@@ -954,7 +956,7 @@
 
   socket.on('session:ended', () => {
     showToast('⏹ La session a été terminée par le host');
-    setTimeout(() => window.location.href = 'index.html', 2500);
+    setTimeout(() => { window.location.href = window.location.origin + '/index.html'; }, 2500);
   });
 
   // ─────────────────────────────────────────────
@@ -1089,7 +1091,7 @@
       localStorage.removeItem('zpeed_code');
       localStorage.removeItem('zpeed_guestId');
       localStorage.removeItem('zpeed_guestName');
-      window.location.href = 'index.html';
+      window.location.href = window.location.origin + '/index.html';
     }
   }
 
