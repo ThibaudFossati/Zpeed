@@ -1675,6 +1675,26 @@
       .replace(/"/g, '&quot;');
   }
 
+  /** Spotify /api/spotify/search error JSON → short French UI line (no secrets). */
+  function formatSpotifySearchErrorForUi(body, httpStatus) {
+    const b = body && typeof body === 'object' ? body : {};
+    const code = b.error;
+    const msg = typeof b.message === 'string' ? b.message : '';
+    const hint = b.details && typeof b.details.hint === 'string' ? b.details.hint : '';
+    if (
+      code === 'spotify_api_error' ||
+      code === 'spotify_unauthorized' ||
+      code === 'spotify_forbidden' ||
+      /Spotify request failed/i.test(msg)
+    ) {
+      const core =
+        'Spotify indisponible — mode test activé côté serveur (USE_MOCK_SPOTIFY) ou reconnecte Spotify ; vérifie aussi SPOTIFY_REDIRECT_URI pour ce domaine.';
+      return hint ? `${core} ${hint}` : core;
+    }
+    if (msg) return msg;
+    return `Erreur Spotify${httpStatus ? ' (' + httpStatus + ')' : ''}`;
+  }
+
   function onSearchInput(val) {
     clearTimeout(_suggestTimer);
     _suggestIndex = -1;
@@ -1819,13 +1839,7 @@
     const spValue = spRes.status === 'fulfilled' ? spRes.value : [];
     let errorMsg = null;
     if (spValue && spValue.__error) {
-      const b = spValue.body || {};
-      const detail =
-        (typeof b.message === 'string' && b.message) ||
-        (typeof b.error === 'string' && b.error) ||
-        (b.error && typeof b.error === 'object' && b.error.message) ||
-        'search failed';
-      errorMsg = `Spotify: ${detail}`;
+      errorMsg = formatSpotifySearchErrorForUi(spValue.body, spValue.status);
     }
     const spTracks = Array.isArray(spValue) ? spValue : [];
     const tracks = [...spTracks, ...ytTracks].slice(0, 15);

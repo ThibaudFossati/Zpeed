@@ -36,13 +36,25 @@ function spotifyApiFailure(res, status, stage, details = {}) {
       : status === 403
       ? 'spotify_forbidden'
       : 'spotify_api_error';
+  let hint =
+    status === 403
+      ? 'Spotify Dashboard → Users and Access: add tester emails in Development mode.'
+      : null;
+  if (stage === 'search.fetch' && status >= 500) {
+    hint =
+      'Spotify API error. Retry later; or set USE_MOCK_SPOTIFY=true. Ensure SPOTIFY_REDIRECT_URI / PUBLIC_APP_URL match this site in Spotify Dashboard.';
+  }
+  const mergedDetails =
+    Object.keys(details).length || hint ? { ...details, ...(hint ? { hint } : {}) } : {};
   const message =
     status === 401
       ? 'Spotify token expired or invalid. Reconnect Spotify.'
       : status === 403
       ? 'Spotify access denied. Check app access/allowlist/scopes.'
+      : stage === 'search.fetch' && status >= 400 && status < 500
+      ? 'Spotify search was rejected. Check token, scopes, and Dashboard settings.'
       : 'Spotify request failed.';
-  return res.status(status || 502).json({ error: code, stage, message, details });
+  return res.status(status || 502).json({ error: code, stage, message, details: mergedDetails });
 }
 
 function hydrateSession(s) {
@@ -118,12 +130,29 @@ function getLanIP() {
 }
 const LAN_IP = getLanIP();
 const PORT = process.env.PORT || 3000;
-// Public base URL: Render injects RENDER_EXTERNAL_URL automatically
-const PUBLIC_BASE = process.env.RENDER_EXTERNAL_URL
-  ? process.env.RENDER_EXTERNAL_URL.replace(/\/$/, '')
-  : `http://${LAN_IP}:${PORT}`;
+
+/** Canonical browser origin for QR / share links (custom domain). Overrides RENDER_EXTERNAL_URL when set. */
+function resolvePublicBase() {
+  const fromEnv =
+    (process.env.PUBLIC_APP_URL || process.env.ZPEED_PUBLIC_URL || '').trim().replace(/\/$/, '');
+  if (fromEnv) return fromEnv;
+  if (process.env.RENDER_EXTERNAL_URL) {
+    return String(process.env.RENDER_EXTERNAL_URL).trim().replace(/\/$/, '');
+  }
+  return `http://${LAN_IP}:${PORT}`;
+}
+
+function publicBaseSource() {
+  if ((process.env.PUBLIC_APP_URL || '').trim()) return 'PUBLIC_APP_URL';
+  if ((process.env.ZPEED_PUBLIC_URL || '').trim()) return 'ZPEED_PUBLIC_URL';
+  if ((process.env.RENDER_EXTERNAL_URL || '').trim()) return 'RENDER_EXTERNAL_URL';
+  return 'lan_ip';
+}
+
+const PUBLIC_BASE = resolvePublicBase();
 
 const app = express();
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 const io = new Server(server);
 
@@ -283,7 +312,7 @@ app.get('/api/auth/status', (req, res) => {
 // ─────────────────────────────────────────────
 // SPOTIFY OAUTH
 // ─────────────────────────────────────────────
-/** Spotify callback URL: explicit SPOTIFY_REDIRECT_URI wins; else REDIRECT_BASE or Render public URL. */
+/** Spotify callback URL: explicit SPOTIFY_REDIRECT_URI wins; else PUBLIC_APP_URL / REDIRECT_BASE / Render URL. */
 function resolveSpotifyRedirectUri() {
   let explicit = (process.env.SPOTIFY_REDIRECT_URI || '').trim().replace(/\/$/, '');
   if (explicit) {
@@ -291,24 +320,24 @@ function resolveSpotifyRedirectUri() {
     return `${explicit}/auth/spotify/callback`;
   }
   const base = (
-    process.env.REDIRECT_BASE ||
-    process.env.RENDER_EXTERNAL_URL ||
+    (process.env.PUBLIC_APP_URL || process.env.ZPEED_PUBLIC_URL || '').trim().replace(/\/$/, '') ||
+    (process.env.REDIRECT_BASE || '').trim().replace(/\/$/, '') ||
+    (process.env.RENDER_EXTERNAL_URL || '').trim().replace(/\/$/, '') ||
     'http://127.0.0.1:3000'
-  )
-    .trim()
-    .replace(/\/$/, '');
+  );
   return `${base}/auth/spotify/callback`;
 }
 
 const SPOTIFY_REDIRECT = resolveSpotifyRedirectUri();
 
-let spotifyOAuthFallbackMock = false;
 function useMockSpotify() {
-  return process.env.USE_MOCK_SPOTIFY === 'true' || spotifyOAuthFallbackMock;
+  return process.env.USE_MOCK_SPOTIFY === 'true';
 }
 
 function spotifyRedirectSource() {
   if ((process.env.SPOTIFY_REDIRECT_URI || '').trim()) return 'SPOTIFY_REDIRECT_URI';
+  if ((process.env.PUBLIC_APP_URL || '').trim()) return 'PUBLIC_APP_URL';
+  if ((process.env.ZPEED_PUBLIC_URL || '').trim()) return 'ZPEED_PUBLIC_URL';
   if ((process.env.REDIRECT_BASE || '').trim()) return 'REDIRECT_BASE';
   if ((process.env.RENDER_EXTERNAL_URL || '').trim()) return 'RENDER_EXTERNAL_URL';
   return 'default_localhost';
@@ -333,11 +362,21 @@ app.get('/api/spotify/oauth-debug', (req, res) => {
   res.json({
     redirectUri: SPOTIFY_REDIRECT,
     redirectSource: spotifyRedirectSource(),
+    publicBase: PUBLIC_BASE,
+    publicBaseSource: publicBaseSource(),
     scopes: SPOTIFY_SCOPES,
+    clientIdPresent: !!process.env.SPOTIFY_CLIENT_ID,
+    clientSecretPresent: !!process.env.SPOTIFY_CLIENT_SECRET,
     hasClientId: !!process.env.SPOTIFY_CLIENT_ID,
     hasClientSecret: !!process.env.SPOTIFY_CLIENT_SECRET,
-    deployCommit: process.env.RENDER_GIT_COMMIT || null,
-    note: 'Allowlist/app mode must be verified in Spotify Developer Dashboard (Users and Access).'
+    useMockSpotify: useMockSpotify(),
+    deployCommit:
+      process.env.RENDER_GIT_COMMIT ||
+      process.env.COMMIT_REF ||
+      process.env.VERCEL_GIT_COMMIT_SHA ||
+      null,
+    note:
+      'Spotify Dashboard → Redirect URIs must include redirectUri above. For custom domains set PUBLIC_APP_URL or SPOTIFY_REDIRECT_URI on Render.'
   });
 });
 
@@ -436,14 +475,18 @@ app.get('/auth/spotify/callback', async (req, res) => {
 
     return res.redirect(`/host.html?code=${state}&platform=spotify`);
   } catch (err) {
-    spotifyOAuthFallbackMock = true;
-    console.log('[SPOTIFY] fallback to mock');
     const status = err.response?.status;
     const body = err.response?.data;
     const safe =
       body && typeof body === 'object'
         ? { error: body.error, error_description: body.error_description }
         : { message: err.message };
+    spotifyDiag('oauth_callback_failed', {
+      status: status || null,
+      redirectUri: SPOTIFY_REDIRECT,
+      redirectSource: spotifyRedirectSource(),
+      ...safe
+    });
     console.error('[SPOTIFY] OAuth callback failed', { status, ...safe });
     res.redirect('/host.html?error=spotify_failed');
   }
@@ -751,7 +794,7 @@ app.post('/api/speaker/connect', async (req, res) => {
   // Lier l'enceinte à cette session
   speakerSessions[key] = code;
 
-  const joinUrl = `http://localhost:3000?speaker=${encodeURIComponent(speakerName)}&speakerId=${key}`;
+  const joinUrl = `${PUBLIC_BASE}/?speaker=${encodeURIComponent(speakerName)}&speakerId=${encodeURIComponent(key)}`;
   const qrDataUrl = await QRCode.toDataURL(joinUrl, {
     color: { dark: '#7B52D4', light: '#1a1a1a' },
     width: 300, margin: 2
@@ -1251,15 +1294,26 @@ app.get('/api/spotify/search', async (req, res) => {
         query: q || '',
         responseError: r.data?.error || null
       });
-      return spotifyApiFailure(res, r.status, 'search.fetch');
+      return spotifyApiFailure(res, r.status, 'search.fetch', {
+        spotifyHttpStatus: r.status,
+        spotifyError: r.data?.error || null
+      });
     }
     if (r.status === 429) {
-      console.log('[SPOTIFY] fallback to mock');
+      console.log('[SPOTIFY] search rate-limited → mock results');
       return res.json(mapSpotifyItemsToTrackResults(getDevMockSpotifyItems(q)));
     }
     if (r.status !== 200) {
-      spotifyDiag('spotify_search_non200', { code, status: r.status, query: q || '' });
-      return spotifyApiFailure(res, r.status || 502, 'search.fetch');
+      spotifyDiag('spotify_search_non200', {
+        code,
+        status: r.status,
+        query: q || '',
+        spotifyError: r.data?.error || null
+      });
+      return spotifyApiFailure(res, r.status || 502, 'search.fetch', {
+        spotifyHttpStatus: r.status,
+        spotifyError: r.data?.error || null
+      });
     }
     if (!Array.isArray(r.data?.tracks?.items)) {
       spotifyDiag('spotify_search_unexpected_shape', {
@@ -1297,7 +1351,12 @@ app.get('/api/session/:code/platforms', (req, res) => {
 });
 
 app.get('/api/config', (req, res) => {
-  res.json({ lanIP: LAN_IP, port: PORT, publicBase: PUBLIC_BASE });
+  res.json({
+    lanIP: LAN_IP,
+    port: PORT,
+    publicBase: PUBLIC_BASE,
+    publicBaseSource: publicBaseSource()
+  });
 });
 
 // ── DEBUG: socket rooms ──
@@ -1346,11 +1405,15 @@ server.listen(PORT, '0.0.0.0', () => {
     SPOTIFY_CLIENT_ID: !!process.env.SPOTIFY_CLIENT_ID,
     SPOTIFY_CLIENT_SECRET: !!process.env.SPOTIFY_CLIENT_SECRET,
     SPOTIFY_REDIRECT_URI_env: !!process.env.SPOTIFY_REDIRECT_URI,
+    PUBLIC_APP_URL: !!process.env.PUBLIC_APP_URL,
+    ZPEED_PUBLIC_URL: !!process.env.ZPEED_PUBLIC_URL,
     REDIRECT_BASE: !!process.env.REDIRECT_BASE,
     RENDER_EXTERNAL_URL: !!process.env.RENDER_EXTERNAL_URL,
     RENDER_GIT_COMMIT: !!process.env.RENDER_GIT_COMMIT,
     USE_MOCK_SPOTIFY: process.env.USE_MOCK_SPOTIFY === 'true',
     spotifyRedirectSource: spotifyRedirectSource(),
-    spotifyCallbackUrl: SPOTIFY_REDIRECT
+    spotifyCallbackUrl: SPOTIFY_REDIRECT,
+    publicBaseSource: publicBaseSource(),
+    publicBase: PUBLIC_BASE
   });
 });
