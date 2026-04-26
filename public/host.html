@@ -307,21 +307,53 @@
       position: fixed;
       bottom: calc(12px + env(safe-area-inset-bottom, 0px));
       left: 10px; right: 10px;
-      height: 66px;
+      min-height: 66px;
       background: rgba(18, 22, 36, 0.82);
       backdrop-filter: blur(32px);
       -webkit-backdrop-filter: blur(32px);
       border: 1px solid rgba(255,255,255,0.09);
       border-radius: 20px;
       display: none; /* shown when track plays */
-      align-items: center;
-      padding: 0 10px;
-      gap: 4px;
+      flex-direction: column;
+      align-items: stretch;
+      padding: 8px 10px;
+      gap: 6px;
       z-index: 90;
       max-width: 480px;
       margin: 0 auto;
     }
     .am-bar.visible { display: flex; }
+    .am-bar-row {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      gap: 4px;
+    }
+    .am-playback-hint {
+      font-size: 0.70rem;
+      line-height: 1.3;
+      color: var(--text2);
+      text-align: center;
+      padding: 0 2px 2px;
+      flex-shrink: 0;
+    }
+    .am-playback-hint[hidden] {
+      display: none !important;
+    }
+    .am-playback-hint--tap {
+      cursor: pointer;
+      color: var(--text2);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .am-btn.am-btn--locked {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+    .am-btn.am-btn--locked:active {
+      transform: none;
+      background: transparent;
+    }
 
     /* Transport — left */
     .am-transport {
@@ -1043,21 +1075,22 @@
 
   <!-- ═══ APPLE MUSIC PLAYER BAR ═══ -->
   <div class="am-bar" id="amBar">
+    <div class="am-playback-hint" id="amPlaybackHint" hidden></div>
+    <div class="am-bar-row">
     <!-- Left: transport controls -->
     <div class="am-transport">
-      <button class="am-btn" onclick="carouselPrev()">
+      <button type="button" class="am-btn" id="amPrevBtn" onclick="carouselPrev()">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
           <polygon points="19 20 9 12 19 4 19 20"/>
           <rect x="5" y="4" width="2.5" height="16" rx="1.25"/>
         </svg>
       </button>
-      <button class="am-btn" id="amPlayBtn" onclick="togglePlayPause()" style="width:44px;height:44px">
+      <button type="button" class="am-btn" id="amPlayBtn" onclick="togglePlayPause()" style="width:44px;height:44px">
         <svg id="amPlayIcon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-          <rect x="6" y="4" width="4" height="16" rx="1.5"/>
-          <rect x="14" y="4" width="4" height="16" rx="1.5"/>
+          <polygon points="5 3 19 12 5 21 5 3"/>
         </svg>
       </button>
-      <button class="am-btn" onclick="skipTrack()">
+      <button type="button" class="am-btn" id="amSkipBtn" onclick="skipTrack()">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
           <polygon points="5 4 15 12 5 20 5 4"/>
           <rect x="16.5" y="4" width="2.5" height="16" rx="1.25"/>
@@ -1096,8 +1129,8 @@
 
     <!-- Right: utility controls -->
     <div class="am-utilities">
-      <!-- AirPlay -->
-      <button class="am-btn" onclick="switchTab('playing')">
+      <!-- Appareil Spotify / aide lecture -->
+      <button type="button" class="am-btn" id="amDeviceBtn" onclick="openAmDeviceButton()" aria-label="Appareil Spotify et aide lecture">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/>
           <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12" y2="20"/>
@@ -1105,7 +1138,7 @@
         </svg>
       </button>
       <!-- EQ sliders -->
-      <button class="am-btn" onclick="switchTab('queue')">
+      <button type="button" class="am-btn" onclick="switchTab('queue')">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
           <line x1="4" y1="6"  x2="20" y2="6"/>
           <line x1="4" y1="12" x2="20" y2="12"/>
@@ -1116,13 +1149,14 @@
         </svg>
       </button>
       <!-- Volume -->
-      <button class="am-btn" id="amVolumeBtn" onclick="cycleSpotifyVolume()">
+      <button type="button" class="am-btn" id="amVolumeBtn" onclick="cycleSpotifyVolume()">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
           <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
         </svg>
       </button>
     </div>
+    </div><!-- /am-bar-row -->
   </div>
 
   <!-- ═══ PANEL : GUESTS ═══ -->
@@ -1198,6 +1232,17 @@
       <button type="button" class="btn btn-secondary btn-block" onclick="closeModal('spotifyManageModal')">Annuler</button>
       <button type="button" class="btn-spotify-disconnect" onclick="confirmSpotifyDisconnect()">Déconnecter Spotify</button>
     </div>
+  </div>
+</div>
+
+<!-- Aide appareil / lecture Spotify (barre du bas) -->
+<div class="modal-overlay" id="amDeviceHelpModal" onclick="closeModalIfBg(event,'amDeviceHelpModal')" style="z-index:245">
+  <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="amDeviceHelpTitle">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="amDeviceHelpTitle"></div>
+    <div id="amDeviceHelpBody"></div>
+    <div id="amDeviceHelpExtra"></div>
+    <button type="button" class="btn btn-secondary" style="margin-top:12px" onclick="closeModal('amDeviceHelpModal')">OK</button>
   </div>
 </div>
 
@@ -1331,6 +1376,9 @@
   let currentTrack = null;
   let guests       = [];
   let roomMeta     = {};
+  let isPlaying    = false;
+  let progressInterval = null;
+  let progressStart = 0;
   let hostVotedTracks = new Set();
   /** @type {Record<string, { v: number, s: string }>} */
   let prevTrackSnap = {};
@@ -1381,7 +1429,7 @@
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.status === 429) {
-        markSpotifyUnavailable('Spotify limite les requêtes — mode test activé.');
+        markSpotifyUnavailable('Spotify limite les requêtes. Réessaie dans quelques minutes.');
         console.warn('[spotify] /v1/me rate-limited (429)');
         return null;
       }
@@ -1444,10 +1492,9 @@
       const profile = sync.data.profile || await fetchSpotifyProfile(sync.data.access_token);
       markConnected('spotify', profile);
       if (window._spotifyMockMode) {
-        markSpotifyUnavailable('Spotify limite les requêtes — mode test activé.');
+        markSpotifyUnavailable('Mode test activé : tu peux chercher et ajouter des titres, mais la lecture Spotify est désactivée.');
       } else {
         window._spotifyRateLimited = false;
-        setSpotifyControlsDisabled(false);
       }
       if (fromSpotifyOAuth) {
         showNotif({ icon: '🎵', title: 'Spotify connecté !', type: 'success' });
@@ -1487,6 +1534,172 @@
 
   function hostSpotifyPlaybackDeviceReady() {
     return !!(window._spotifyDeviceId && window._spotifySdkConnected);
+  }
+
+  /** @returns {'mock'|'no_spotify'|'rate_limited'|'needs_device'|'ready'} */
+  function getHostPlaybackUiState() {
+    if (window._spotifyMockMode) return 'mock';
+    if (!hostSpotifyChipIsLinked()) return 'no_spotify';
+    if (window._spotifyRateLimited) return 'rate_limited';
+    if (roomMeta.playerLost) return 'needs_device';
+    if (!hostSpotifyPlaybackDeviceReady()) return 'needs_device';
+    return 'ready';
+  }
+
+  function hostAmBarTransportLocked() {
+    if (window._spotifyMockMode) return true;
+    if (window._spotifyRateLimited) return true;
+    if (!hostSpotifyChipIsLinked()) return false;
+    if (roomMeta.playerLost) return true;
+    if (!hostSpotifyPlaybackDeviceReady()) return true;
+    return false;
+  }
+
+  function applyAmBarPlaybackUi() {
+    const hint = document.getElementById('amPlaybackHint');
+    const locked = hostAmBarTransportLocked();
+    const st = getHostPlaybackUiState();
+    const deviceBtn = document.getElementById('amDeviceBtn');
+    ['amPrevBtn', 'amPlayBtn', 'amSkipBtn', 'amVolumeBtn'].forEach(id => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      btn.classList.toggle('am-btn--locked', locked);
+      btn.disabled = !!locked;
+      btn.setAttribute('aria-disabled', locked ? 'true' : 'false');
+    });
+    if (deviceBtn) {
+      const deviceLocked = st === 'mock';
+      deviceBtn.classList.toggle('am-btn--locked', deviceLocked);
+      deviceBtn.disabled = !!deviceLocked;
+      deviceBtn.setAttribute('aria-disabled', deviceLocked ? 'true' : 'false');
+    }
+    if (hint) {
+      hint.onclick = null;
+      hint.onkeydown = null;
+      hint.classList.remove('am-playback-hint--tap');
+      hint.removeAttribute('role');
+      hint.removeAttribute('tabindex');
+      hint.removeAttribute('title');
+      if (st === 'mock') {
+        hint.hidden = false;
+        hint.textContent = 'Mode test : recherche et file d’attente actives, lecture Spotify désactivée.';
+        hint.classList.add('am-playback-hint--tap');
+        hint.setAttribute('role', 'button');
+        hint.tabIndex = 0;
+        hint.title = 'Plus d’infos sur le mode test';
+        hint.onclick = () => openAmDeviceHelp('mock');
+        hint.onkeydown = (e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          e.preventDefault();
+          openAmDeviceHelp('mock');
+        };
+      } else if (st === 'needs_device') {
+        hint.hidden = false;
+        hint.textContent = 'Ouvre Spotify sur ton téléphone ou ordinateur, puis choisis SONDER comme appareil.';
+        hint.classList.add('am-playback-hint--tap');
+        hint.setAttribute('role', 'button');
+        hint.tabIndex = 0;
+        hint.title = 'Instructions pour choisir l’appareil Spotify';
+        hint.onclick = () => openAmDeviceHelp('setup');
+        hint.onkeydown = (e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          e.preventDefault();
+          openAmDeviceHelp('setup');
+        };
+      } else if (st === 'rate_limited') {
+        hint.hidden = false;
+        hint.textContent = 'Spotify limite les requêtes. Réessaie dans quelques minutes.';
+        hint.classList.add('am-playback-hint--tap');
+        hint.setAttribute('role', 'button');
+        hint.tabIndex = 0;
+        hint.title = 'Plus d’infos';
+        hint.onclick = () => openAmDeviceHelp('ratelimit');
+        hint.onkeydown = (e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          e.preventDefault();
+          openAmDeviceHelp('ratelimit');
+        };
+      } else {
+        hint.hidden = true;
+        hint.textContent = '';
+      }
+    }
+    if (locked) {
+      stopProgressSim();
+      const icon = document.getElementById('amPlayIcon');
+      if (icon) icon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
+      isPlaying = false;
+    }
+  }
+
+  function retrySpotifyTransferToHostDevice() {
+    if (!window._spotifyToken || !window._spotifyDeviceId) {
+      showToast('Appareil Spotify non prêt.');
+      return;
+    }
+    fetch('https://api.spotify.com/v1/me/player', {
+      method: 'PUT',
+      body: JSON.stringify({ device_ids: [window._spotifyDeviceId], play: false }),
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window._spotifyToken}` }
+    }).then(res => {
+      if (res.status === 204 || res.status === 202) {
+        showToast('Lecture basculée vers cet appareil');
+        closeModal('amDeviceHelpModal');
+        return;
+      }
+      if (res.status === 429) {
+        markSpotifyUnavailable('Spotify limite les requêtes. Réessaie dans quelques minutes.');
+        showToast('Trop de requêtes Spotify — réessaie plus tard');
+        return;
+      }
+      if (res.status === 401 || res.status === 403) {
+        showToast('Session Spotify expirée — reconnecte-toi.');
+        return;
+      }
+      showToast('Impossible de basculer la lecture (erreur ' + res.status + ')');
+    }).catch(() => showToast('Erreur réseau'));
+  }
+
+  function openAmDeviceHelp(kind) {
+    const m = document.getElementById('amDeviceHelpModal');
+    const title = document.getElementById('amDeviceHelpTitle');
+    const body = document.getElementById('amDeviceHelpBody');
+    const extra = document.getElementById('amDeviceHelpExtra');
+    if (!m || !title || !body || !extra) return;
+    extra.innerHTML = '';
+    if (kind === 'mock') {
+      title.textContent = 'Mode test';
+      body.innerHTML = '<p class="spotify-manage-body">Lecture désactivée en mode test.</p><p class="spotify-manage-body" style="margin-top:8px">Tu peux chercher et gérer la file d’attente ; la lecture Spotify réelle n’est pas disponible.</p>';
+    } else if (kind === 'nolink') {
+      title.textContent = 'Spotify';
+      body.innerHTML = '<p class="spotify-manage-body">Connecte d’abord Spotify depuis l’onglet Sources pour lancer la lecture sur cet appareil.</p>';
+    } else if (kind === 'ratelimit') {
+      title.textContent = 'Limite Spotify';
+      body.innerHTML = '<p class="spotify-manage-body">Spotify limite momentanément les requêtes. Attends quelques minutes ou réessaie plus tard.</p>';
+    } else if (kind === 'setup') {
+      title.textContent = 'Écouter sur Spotify';
+      body.innerHTML = `
+        <ol style="margin:0 0 0 1.1rem;padding:0;color:var(--text2);font-size:0.88rem;line-height:1.45;text-align:left">
+          <li>Ouvre l’app Spotify sur ton téléphone ou ordinateur.</li>
+          <li>Lance la lecture d’une piste quelconque.</li>
+          <li>Ouvre le sélecteur d’appareil (icône « appareils » en bas).</li>
+          <li>Choisis <strong>SONDER</strong> ou l’appareil navigateur affiché pour cette page.</li>
+        </ol>`;
+    } else if (kind === 'ready') {
+      title.textContent = 'Appareil de lecture';
+      body.innerHTML = '<p class="spotify-manage-body">Ce navigateur est l’appareil Spotify de la session. Si le son ne sort pas ici, ouvre Spotify et choisis cet appareil (SONDER ou le nom affiché pour cette page).</p>';
+      extra.innerHTML = '<button type="button" class="btn btn-secondary btn-block" style="margin-top:10px" onclick="retrySpotifyTransferToHostDevice()">Basculer la lecture vers cet appareil</button>';
+    }
+    m.classList.add('open');
+  }
+
+  function openAmDeviceButton() {
+    const st = getHostPlaybackUiState();
+    if (st === 'mock') openAmDeviceHelp('mock');
+    else if (st === 'no_spotify') openAmDeviceHelp('nolink');
+    else if (st === 'rate_limited') openAmDeviceHelp('ratelimit');
+    else if (st === 'needs_device') openAmDeviceHelp('setup');
+    else openAmDeviceHelp('ready');
   }
 
   function syncSpotifyHeaderChip() {
@@ -1560,7 +1773,7 @@
     const devReady = hostSpotifyPlaybackDeviceReady();
     if (serverNeeds && !devReady) {
       warn.style.display = 'block';
-      warn.textContent = 'Active Spotify sur un appareil pour lancer le son.';
+      warn.textContent = 'Ouvre Spotify sur ton téléphone ou ordinateur, puis choisis SONDER comme appareil.';
     } else {
       warn.style.display = 'none';
       warn.textContent = '';
@@ -1573,6 +1786,7 @@
     updateSourcesSpotifyCta();
     updateSourcesSearchHint();
     updateLivePlaybackHints();
+    applyAmBarPlaybackUi();
   }
 
   function hostSpotifyChipIsLinked() {
@@ -1695,7 +1909,7 @@
       return 'Session Spotify expirée — reconnecte Spotify.';
     }
     if (code === 'spotify_rate_limited' || httpStatus === 429) {
-      return 'Spotify limite les requêtes — mode test activé.';
+      return 'Mode test activé : tu peux chercher et ajouter des titres, mais la lecture Spotify est désactivée.';
     }
     if (
       code === 'spotify_api_error' ||
@@ -2126,7 +2340,7 @@
         events: {
           onStateChange: function(e) {
             if (e.data === YT.PlayerState.ENDED) {
-              skipTrack(); // auto-advance queue
+              skipTrack({ force: true }); // auto-advance queue
             }
           }
         }
@@ -2151,20 +2365,12 @@
   window._spotifyVolume = 0.8;
   window._spotifySdkConnected = false;
 
-  function setSpotifyControlsDisabled(disabled) {
-    const playBtn = document.getElementById('amPlayBtn');
-    const volBtn = document.getElementById('amVolumeBtn');
-    [playBtn, volBtn].forEach(btn => {
-      if (!btn) return;
-      btn.disabled = !!disabled;
-      btn.style.opacity = disabled ? '0.45' : '';
-      btn.style.pointerEvents = disabled ? 'none' : '';
-    });
-  }
-
-  function markSpotifyUnavailable(reason = 'Spotify temporarily unavailable') {
-    window._spotifyRateLimited = true;
-    setSpotifyControlsDisabled(true);
+  function markSpotifyUnavailable(reason = 'Spotify temporairement indisponible') {
+    if (window._spotifyMockMode) {
+      window._spotifyRateLimited = false;
+    } else {
+      window._spotifyRateLimited = true;
+    }
     const status = document.getElementById('spotify-player-status');
     if (status) {
       if (window._spotifyMockMode) {
@@ -2194,7 +2400,6 @@
       window._spotifyDeviceId = device_id;
       window._spotifySdkConnected = true;
       window._spotifyRateLimited = false;
-      setSpotifyControlsDisabled(false);
       showToast('🎵 Spotify prêt — cet appareil joue sur l\'enceinte');
       socket.emit('host:spotify_device', { code, hostSecret, deviceId: device_id });
       refreshSpotifyHostUi();
@@ -2205,7 +2410,10 @@
       });
       console.log('[spotify] transfer playback status:', transferRes.status);
       if (transferRes.status === 429) {
-        markSpotifyUnavailable('Spotify temporarily unavailable');
+        markSpotifyUnavailable('Spotify limite les requêtes. Réessaie dans quelques minutes.');
+      }
+      if (transferRes.status === 401 || transferRes.status === 403) {
+        showToast('Session Spotify expirée — reconnecte-toi.');
       }
     });
 
@@ -2214,7 +2422,7 @@
       if (!state || !state.paused) return;
       // Track ended = paused at position 0 with a previous track
       if (state.position === 0 && state.track_window.previous_tracks.length > 0) {
-        skipTrack();
+        skipTrack({ force: true });
       }
     });
 
@@ -2228,7 +2436,6 @@
       localStorage.removeItem('zpeed_spotify_token');
       window._spotifyToken = null;
       socket.emit('host:playback_lost', { code, hostSecret });
-      setSpotifyControlsDisabled(true);
       refreshSpotifyHostUi();
     });
     player.addListener('account_error',     ({ message }) => console.warn('Spotify account error:', message));
@@ -2252,7 +2459,7 @@
         }
       }
       if (window._spotifyMockMode) {
-        markSpotifyUnavailable('Spotify temporarily unavailable');
+        markSpotifyUnavailable('Mode test activé : tu peux chercher et ajouter des titres, mais la lecture Spotify est désactivée.');
         return;
       }
       window._spotifyToken = access_token;
@@ -2264,19 +2471,21 @@
   }
 
   async function playSpotifyTrack(uri) {
-    document.getElementById('spotify-player-status').style.display = 'block';
-    document.getElementById('yt-player').style.display = 'none';
     if (window._spotifyMockMode) {
-      markSpotifyUnavailable('Spotify temporarily unavailable');
       console.log('[spotify] playback skipped (mock mode)');
       return;
     }
+    const spStatus = document.getElementById('spotify-player-status');
+    if (spStatus) spStatus.style.display = 'block';
+    document.getElementById('yt-player').style.display = 'none';
     if (!window._spotifyToken || window._spotifyRateLimited) {
       console.log('[spotify] playback blocked:', { hasToken: !!window._spotifyToken, rateLimited: window._spotifyRateLimited });
+      if (window._spotifyRateLimited) showToast('Spotify limite les requêtes — réessaie plus tard.');
       return;
     }
     if (!window._spotifyDeviceId) {
-      showToast('⚠️ Spotify non initialisé sur cet appareil');
+      showToast('Aucun appareil Spotify prêt sur cette page.');
+      openAmDeviceHelp('setup');
       return;
     }
     console.log('[spotify] playback attempt:', { uri, deviceId: window._spotifyDeviceId });
@@ -2291,7 +2500,12 @@
     if (!res) return;
     console.log('[spotify] playback response:', res.status);
     if (res.status === 429) {
-      markSpotifyUnavailable('Spotify temporarily unavailable');
+      markSpotifyUnavailable('Spotify limite les requêtes. Réessaie dans quelques minutes.');
+      showToast('Trop de requêtes Spotify (429).');
+      return;
+    }
+    if (res.status === 401 || res.status === 403) {
+      showToast('Session Spotify expirée ou accès refusé — reconnecte-toi.');
       return;
     }
   }
@@ -2795,7 +3009,12 @@
   // ACTIONS
   // ─────────────────────────────────────────────
   function playTrack(id)  { socket.emit('track:play', { code, trackId: id }); }
-  function skipTrack()    { socket.emit('track:skip', { code }); }
+  function skipTrack(opts) {
+    if (!opts || !opts.force) {
+      if (hostAmBarTransportLocked()) return;
+    }
+    socket.emit('track:skip', { code });
+  }
 
   function confirmEndSession() {
     if (confirm('Terminer la session ? Tous les guests seront déconnectés.')) {
@@ -2823,6 +3042,8 @@
     if (e.key !== 'Escape') return;
     const m = document.getElementById('spotifyManageModal');
     if (m && m.classList.contains('open')) closeModal('spotifyManageModal');
+    const dh = document.getElementById('amDeviceHelpModal');
+    if (dh && dh.classList.contains('open')) closeModal('amDeviceHelpModal');
   });
   function copyLink() {
     const link = window._joinUrl || `${location.origin}/?code=${code}`;
@@ -2890,12 +3111,9 @@
   // (renderCarousel is still called from updateMiniPlayer)
   // ─────────────────────────────────────────────
   let carouselIndex = 0;
-  let isPlaying = false;
   let carouselTouchStartX = 0;
   let carouselTouchStartY = 0;
   let carouselDragDelta = 0;
-  let progressInterval = null;
-  let progressStart = 0;
   const TRACK_DURATION = 210; // 3m30 default
 
   function renderCarousel() {
@@ -2909,12 +3127,13 @@
   }
 
   function updateAmBar(track) {
-    if (!track) { document.getElementById('amBar').classList.remove('visible'); return; }
+    if (!track) { document.getElementById('amBar').classList.remove('visible'); applyAmBarPlaybackUi(); return; }
     document.getElementById('amBar').classList.add('visible');
     document.getElementById('amThumb').src              = track.thumbnail || '';
     document.getElementById('amThumb').onerror          = function() { this.src = THUMB_FALLBACK; };
     document.getElementById('amArtist').textContent     = track.channel   || '—';
     document.getElementById('amTitle').textContent      = track.title     || '—';
+    applyAmBarPlaybackUi();
   }
 
   // ── Swipe gesture ──────────────────────────────
@@ -2931,6 +3150,7 @@
     if (dx > dy && dx > 8) e.preventDefault();
   }
   function onCarouselTouchEnd() {
+    if (hostAmBarTransportLocked()) { carouselDragDelta = 0; return; }
     const tracks = [];
     if (currentTrack) tracks.push(currentTrack);
     tracks.push(...queue);
@@ -2947,6 +3167,7 @@
 
   // ── Navigation ──────────────────────────────────
   function carouselPrev() {
+    if (hostAmBarTransportLocked()) return;
     if (carouselIndex > 0) { carouselIndex--; renderCarousel(); }
   }
   function carouselNext() {
@@ -2956,9 +3177,19 @@
 
   // ── Play / Pause toggle ─────────────────────────
   async function togglePlayPause() {
+    if (hostAmBarTransportLocked()) {
+      const st = getHostPlaybackUiState();
+      if (currentTrack?.spotifyUri) {
+        if (st === 'mock') showToast('Mode test : lecture Spotify désactivée.');
+        else if (st === 'needs_device') openAmDeviceHelp('setup');
+        else if (st === 'rate_limited') showToast('Spotify limite les requêtes — réessaie plus tard.');
+        else showToast('Lecture indisponible pour le moment.');
+      }
+      return;
+    }
     if (currentTrack?.spotifyUri) {
-      if (!window._spotifyPlayer || window._spotifyMockMode || window._spotifyRateLimited || !window._spotifyToken) {
-        markSpotifyUnavailable('Spotify temporarily unavailable');
+      if (!window._spotifyPlayer || !window._spotifyToken) {
+        openAmDeviceHelp('setup');
         return;
       }
       try {
@@ -2966,6 +3197,7 @@
         console.log('[spotify] togglePlay fired');
       } catch (e) {
         console.warn('[spotify] togglePlay failed:', e.message);
+        showToast('Lecture Spotify impossible — vérifie l’appareil.');
       }
       return;
     }
@@ -2983,8 +3215,9 @@
   }
 
   function cycleSpotifyVolume() {
-    if (!window._spotifyPlayer || window._spotifyMockMode || window._spotifyRateLimited || !window._spotifyToken) {
-      markSpotifyUnavailable('Spotify temporarily unavailable');
+    if (hostAmBarTransportLocked()) return;
+    if (!window._spotifyPlayer || !window._spotifyToken) {
+      openAmDeviceHelp('setup');
       return;
     }
     const presets = [0.2, 0.5, 0.8, 1];
