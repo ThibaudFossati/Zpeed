@@ -1368,6 +1368,7 @@ function getDevMockSpotifyItems(rawQuery) {
 
 function mapSpotifyItemsToTrackResults(items) {
   return items.map(t => ({
+    id: t.id || t.spotifyId || null,
     platform: 'spotify',
     spotifyUri: t.uri,
     spotifyId: t.id,

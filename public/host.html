@@ -23,6 +23,7 @@
       position: relative;
       z-index: 1;
       max-width: 100%;
+      overflow: visible;
     }
 
     /* ── Platform pills ── */
@@ -468,17 +469,26 @@
     }
     .ticker-sep { display: inline; color: var(--text3); padding: 0 10px; }
 
-    /* .btn-search + .search-suggestions: globaux (style.css) — états spécifiques host */
-
-    .search-suggestions {
-      position: absolute; top: calc(100% + 6px); left: 0;
-      background: rgba(18,18,20,0.98);
-      border-radius: 12px; overflow: hidden;
-      z-index: 500;
-      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    /* Live search: document flow under input (avoids clip/stacking issues vs absolute dropdown) */
+    .host-search-live--panel {
       display: none;
+      width: 100%;
+      margin-top: 8px;
+      box-sizing: border-box;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(18,18,20,0.98);
+      overflow: hidden;
+      position: relative;
+      z-index: 2;
+      max-height: min(62vh, 520px);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
     }
-    .search-suggestions.open { display: block; animation: suggFadeIn 0.18s ease; }
+    .host-search-live--panel.open {
+      display: block;
+      animation: suggFadeIn 0.18s ease;
+    }
     @keyframes suggFadeIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
 
     .sugg-item {
@@ -979,10 +989,9 @@
           </svg>
         </button>
       </div>
-      <div class="search-suggestions" id="searchSuggestions"></div>
+      <div class="host-search-live--panel" id="hostSearchResults" role="region" aria-live="polite" aria-label="Résultats de recherche"></div>
     </div>
     <p class="sources-search-hint" id="sourcesSearchHint">Recherche un titre à ajouter à la soirée</p>
-    <div id="hostSearchResults"></div>
 
     <!-- Playlists panel (inside platforms tab) -->
     <div id="playlistsPanel" style="display:none;margin-bottom:16px">
@@ -1712,14 +1721,22 @@
     if (q.length < 2) {
       _liveSearchSeq++;
       hideSuggestions();
-      document.getElementById('hostSearchResults').innerHTML = '';
       return;
     }
     _suggestTimer = setTimeout(() => executeLiveSearch(q, { fromButton: false }), 250);
   }
 
   function onSearchKeydown(e) {
-    const box = document.getElementById('searchSuggestions');
+    const box = document.getElementById('hostSearchResults');
+    const panelOpen = box && box.classList.contains('open');
+    if (e.key === 'Escape') {
+      hideSuggestions();
+      return;
+    }
+    if (!panelOpen) {
+      if (e.key === 'Enter') hostSearch();
+      return;
+    }
     const items = box.querySelectorAll('.sugg-item');
     if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -1736,8 +1753,6 @@
       } else {
         hostSearch();
       }
-    } else if (e.key === 'Escape') {
-      hideSuggestions();
     }
   }
 
@@ -1788,6 +1803,7 @@
     requestAnimationFrame(() => {
       document.querySelector('.search-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
+    el.classList.add('open');
     el.innerHTML = `
       <div class="related-explore" role="region" aria-label="Morceaux liés">
         <button type="button" class="related-back" onclick="clearRelatedExplore()">Retour à la recherche</button>
@@ -1809,6 +1825,7 @@
       const warnHtml = errorMsg && filtered.length
         ? `<div class="related-explore-warn">${escapeHtml(errorMsg)}</div>`
         : '';
+      el.classList.add('open');
       el.innerHTML = `
         <div class="related-explore" role="region" aria-label="Morceaux liés">
           <button type="button" class="related-back" onclick="clearRelatedExplore()">Retour à la recherche</button>
@@ -1817,6 +1834,7 @@
           ${bodyHtml}
         </div>`;
     } catch (err) {
+      el.classList.add('open');
       el.innerHTML = `
         <div class="related-explore" role="region" aria-label="Morceaux liés">
           <button type="button" class="related-back" onclick="clearRelatedExplore()">Retour à la recherche</button>
@@ -1827,47 +1845,90 @@
   }
 
   function clearRelatedExplore() {
-    document.getElementById('hostSearchResults').innerHTML = '';
+    const panel = document.getElementById('hostSearchResults');
+    if (panel) {
+      panel.innerHTML = '';
+      panel.classList.remove('open');
+    }
     const q = document.getElementById('hostSearchInput').value.trim();
     if (q.length >= 2) executeLiveSearch(q, { fromButton: false });
+  }
+
+  function normalizeSpotifySearchBody(body) {
+    if (Array.isArray(body)) return body;
+    if (body && Array.isArray(body.tracks)) return body.tracks;
+    if (body && Array.isArray(body.results)) return body.results;
+    return [];
+  }
+
+  function normalizeLiveTrack(t) {
+    if (!t || typeof t !== 'object') return null;
+    const id =
+      t.id ||
+      t.spotifyId ||
+      t.videoId ||
+      (typeof t.spotifyUri === 'string' ? 'sp_' + t.spotifyUri.replace(/:/g, '_') : null) ||
+      null;
+    const title = t.title || t.name || '';
+    const channel =
+      t.channel ||
+      t.artist ||
+      (Array.isArray(t.artists) ? t.artists.map(a => a.name).filter(Boolean).join(', ') : '') ||
+      '';
+    if (!title && !channel && !id) return null;
+    return { ...t, id: id || `row_${title.slice(0, 24)}_${channel.slice(0, 16)}`, title, channel };
   }
 
   async function fetchLiveSearchResults(q) {
     const [ytRes, spRes] = await Promise.allSettled([
       fetch(`/api/search?q=${encodeURIComponent(q)}`).then(r => r.json()).catch(() => []),
-      fetch(`/api/spotify/search?q=${encodeURIComponent(q)}&code=${code}`)
+      fetch(`/api/spotify/search?q=${encodeURIComponent(q)}&code=${encodeURIComponent(code)}`)
         .then(async r => {
           const body = await r.json().catch(() => ({}));
+          console.log('[HOST_SEARCH] fetch status', { spotifyHttp: r.status, ok: r.ok });
           if (!r.ok) return { __error: true, status: r.status, body };
           return body;
         })
         .catch(() => ({ __error: true, status: 0, body: { message: 'Spotify unreachable' } }))
     ]);
 
-    const ytTracks = (ytRes.status === 'fulfilled' && Array.isArray(ytRes.value)) ? ytRes.value : [];
+    const ytRaw = ytRes.status === 'fulfilled' ? ytRes.value : [];
+    const ytTracks = (Array.isArray(ytRaw) ? ytRaw : normalizeSpotifySearchBody(ytRaw))
+      .map(normalizeLiveTrack)
+      .filter(Boolean);
+
     const spValue = spRes.status === 'fulfilled' ? spRes.value : [];
     let errorMsg = null;
     if (spValue && spValue.__error) {
       errorMsg = formatSpotifySearchErrorForUi(spValue.body, spValue.status);
     }
-    const spTracks = Array.isArray(spValue) ? spValue : [];
+    const spRaw = spValue && spValue.__error ? [] : spValue;
+    const spTracks = normalizeSpotifySearchBody(spRaw)
+      .map(normalizeLiveTrack)
+      .filter(Boolean);
+
+    console.log('[HOST_SEARCH] raw shape', {
+      ytIsArray: Array.isArray(ytRaw),
+      spIsArray: Array.isArray(spRaw),
+      spError: !!(spValue && spValue.__error)
+    });
     const tracks = [...spTracks, ...ytTracks].slice(0, 15);
+    console.log('[HOST_SEARCH] normalized count', tracks.length);
     return { tracks, errorMsg };
   }
 
   async function executeLiveSearch(q, { fromButton }) {
-    const box = document.getElementById('searchSuggestions');
+    const box = document.getElementById('hostSearchResults');
     const searchBtn = document.getElementById('hostSearchBtn');
     const mySeq = ++_liveSearchSeq;
 
     if (!box) {
-      console.warn('[HOST_SEARCH] missing #searchSuggestions');
+      console.warn('[HOST_SEARCH] missing #hostSearchResults');
       return;
     }
 
     console.log('[HOST_SEARCH] fetch start', { q: q.slice(0, 48), fromButton, seq: mySeq });
-
-    document.getElementById('hostSearchResults').innerHTML = '';
+    console.log('[HOST_SEARCH] render target found', { id: 'hostSearchResults', inDom: !!box });
 
     if (fromButton && searchBtn) {
       searchBtn.classList.add('is-loading');
@@ -1893,7 +1954,7 @@
       if (errorMsg && !tracks.length) {
         box.innerHTML = `<div class="sugg-empty" style="color:#f87171">${escapeHtml(errorMsg)}</div>`;
         box.classList.add('open');
-        console.log('[HOST_SEARCH] render done', { mode: 'error-empty' });
+        console.log('[HOST_SEARCH] render done visible', { mode: 'error-empty', open: box.classList.contains('open') });
         return;
       }
       if (errorMsg) showToast(errorMsg);
@@ -1902,17 +1963,17 @@
       if (!_suggestData.length) {
         box.innerHTML = '<div class="sugg-empty">Aucun résultat</div>';
         box.classList.add('open');
-        console.log('[HOST_SEARCH] render done', { mode: 'no-results' });
+        console.log('[HOST_SEARCH] render done visible', { mode: 'no-results', open: true });
         return;
       }
       renderSuggestions(_suggestData);
-      console.log('[HOST_SEARCH] render done', { mode: 'list', n: _suggestData.length });
+      console.log('[HOST_SEARCH] render done visible', { mode: 'list', n: _suggestData.length, open: box.classList.contains('open') });
     } catch (err) {
       if (mySeq !== _liveSearchSeq) return;
-      const msg = err && err.message ? String(err.message) : 'Recherche indisponible';
+      const msg = err && err.message ? String(err.message) : 'Spotify indisponible — réessaie.';
       box.innerHTML = `<div class="sugg-empty" style="color:#f87171">${escapeHtml(msg)}</div>`;
       box.classList.add('open');
-      console.log('[HOST_SEARCH] render done', { mode: 'exception', err: msg });
+      console.log('[HOST_SEARCH] render done visible', { mode: 'exception', err: msg });
     } finally {
       if (fromButton && searchBtn) {
         searchBtn.classList.remove('is-loading');
@@ -1922,7 +1983,8 @@
   }
 
   function renderSuggestions(items) {
-    const box = document.getElementById('searchSuggestions');
+    const box = document.getElementById('hostSearchResults');
+    if (!box) return;
     if (!items.length) {
       box.innerHTML = '<div class="sugg-empty">Aucun résultat</div>';
       box.classList.add('open');
@@ -1934,7 +1996,7 @@
   }
 
   function hideSuggestions() {
-    const box = document.getElementById('searchSuggestions');
+    const box = document.getElementById('hostSearchResults');
     if (!box) return;
     box.classList.remove('open');
     box.innerHTML = '';
