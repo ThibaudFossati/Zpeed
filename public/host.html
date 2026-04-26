@@ -1372,8 +1372,13 @@
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.status === 429) {
-        markSpotifyUnavailable('Spotify temporarily unavailable');
+        markSpotifyUnavailable('Spotify limite les requêtes — mode test activé.');
         console.warn('[spotify] /v1/me rate-limited (429)');
+        return null;
+      }
+      if (res.status === 401 || res.status === 403) {
+        localStorage.removeItem('zpeed_spotify_token');
+        window._spotifyToken = null;
         return null;
       }
       if (!res.ok) return null;
@@ -1385,26 +1390,30 @@
     } catch(e) { return null; }
   }
 
-  async function handleSpotifyServerCallback() {
+  /** Always prefer server session token; clear stale localStorage on 401/403/404. */
+  async function syncSpotifyTokenFromServer() {
     try {
-      const res = await fetch(spotifyTokenUrl());
-      if (!res.ok) return;
-      const data = await res.json();
-      if (!data.access_token) return;
-      window._spotifyMockMode = !!data.use_mock_spotify;
-      window._spotifyToken = data.access_token;
-      localStorage.setItem('zpeed_spotify_token', data.access_token);
-      // Use profile from server if available, otherwise fetch from Spotify API
-      const profile = data.profile || await fetchSpotifyProfile(data.access_token);
-      markConnected('spotify', profile);
-      if (window._spotifyMockMode) {
-        markSpotifyUnavailable('Spotify temporarily unavailable');
-      } else {
-        window._spotifyRateLimited = false;
-        setSpotifyControlsDisabled(false);
+      const res = await fetch(spotifyTokenUrl(), { credentials: 'same-origin' });
+      let data = {};
+      try {
+        data = await res.json();
+      } catch (e) {
+        data = {};
       }
-      showNotif({ icon: '🎵', title: 'Spotify connecté !', type: 'success' });
-    } catch(e) { console.error('Spotify callback error:', e); }
+      if (res.ok && data.access_token) {
+        window._spotifyMockMode = !!data.use_mock_spotify;
+        window._spotifyToken = data.access_token;
+        localStorage.setItem('zpeed_spotify_token', data.access_token);
+        return { ok: true, data };
+      }
+      if (res.status === 401 || res.status === 403 || res.status === 404) {
+        localStorage.removeItem('zpeed_spotify_token');
+        window._spotifyToken = null;
+      }
+      return { ok: false, status: res.status, data };
+    } catch (e) {
+      return { ok: false, status: 0, data: {} };
+    }
   }
 
   // Legacy PKCE callback handler (in case of old redirects)
@@ -1418,38 +1427,36 @@
   // Server-side OAuth handles token storage automatically via /auth/spotify/callback
 
   async function checkPlatforms() {
-    // Check for server-side Spotify callback (redirected back with ?platform=spotify)
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('platform') === 'spotify') {
-      await handleSpotifyServerCallback();
+    const fromSpotifyOAuth = urlParams.get('platform') === 'spotify';
+
+    const sync = await syncSpotifyTokenFromServer();
+    if (sync.ok && sync.data?.access_token) {
+      const profile = sync.data.profile || await fetchSpotifyProfile(sync.data.access_token);
+      markConnected('spotify', profile);
+      if (window._spotifyMockMode) {
+        markSpotifyUnavailable('Spotify limite les requêtes — mode test activé.');
+      } else {
+        window._spotifyRateLimited = false;
+        setSpotifyControlsDisabled(false);
+      }
+      if (fromSpotifyOAuth) {
+        showNotif({ icon: '🎵', title: 'Spotify connecté !', type: 'success' });
+      }
+    } else {
+      if (fromSpotifyOAuth) {
+        showToast('Spotify doit être reconnecté.');
+      }
+      if (sync.status === 401 || sync.status === 403 || sync.status === 404) {
+        localStorage.removeItem('zpeed_spotify_token');
+        window._spotifyToken = null;
+      }
     }
-    // Check stored Spotify token
-    const storedToken = localStorage.getItem('zpeed_spotify_token');
-    if (storedToken) {
-      window._spotifyToken = storedToken;
-      // Restaure le profil depuis localStorage (instantané) puis tente un refresh
-      const cachedName = localStorage.getItem('zpeed_spotify_name');
-      const cachedPic  = localStorage.getItem('zpeed_spotify_pic');
-      markConnected('spotify', cachedName ? { name: cachedName, picture: cachedPic } : null);
-      // Rafraîchit le profil en arrière-plan si le token est valide
-      fetchSpotifyProfile(storedToken).then(p => { if (p) markConnected('spotify', p); });
+
+    if (window._spotifyToken) {
+      fetchSpotifyProfile(window._spotifyToken).then(p => { if (p) markConnected('spotify', p); });
     }
-    // Also check server for Spotify token (in case server-side OAuth was used)
-    if (!window._spotifyToken) {
-      try {
-        const res = await fetch(spotifyTokenUrl());
-        if (res.ok) {
-          const data = await res.json();
-          window._spotifyMockMode = !!data.use_mock_spotify;
-          if (data.access_token) {
-            window._spotifyToken = data.access_token;
-            localStorage.setItem('zpeed_spotify_token', data.access_token);
-            markConnected('spotify');
-            if (window._spotifyMockMode) markSpotifyUnavailable('Spotify temporarily unavailable');
-          }
-        }
-      } catch(e) {}
-    }
+
     refreshSpotifyHostUi();
   }
 
@@ -1672,17 +1679,28 @@
     const code = b.error;
     const msg = typeof b.message === 'string' ? b.message : '';
     const hint = b.details && typeof b.details.hint === 'string' ? b.details.hint : '';
+    if (code === 'spotify_no_token' || code === 'spotify_not_connected' || b.needSpotify === true) {
+      return 'Spotify doit être reconnecté.';
+    }
+    if (code === 'spotify_needs_reconnect' || code === 'spotify_refresh_revoked' || code === 'spotify_refresh_failed') {
+      return 'Session Spotify expirée — reconnecte Spotify.';
+    }
+    if (code === 'spotify_rate_limited' || httpStatus === 429) {
+      return 'Spotify limite les requêtes — mode test activé.';
+    }
     if (
       code === 'spotify_api_error' ||
       code === 'spotify_unauthorized' ||
       code === 'spotify_forbidden' ||
+      code === 'spotify_token_invalid' ||
       /Spotify request failed/i.test(msg)
     ) {
       const core =
-        'Spotify indisponible — mode test activé côté serveur (USE_MOCK_SPOTIFY) ou reconnecte Spotify ; vérifie aussi SPOTIFY_REDIRECT_URI pour ce domaine.';
+        'Spotify indisponible — réessaie. Si ça continue, reconnecte Spotify ou active le mode test serveur.';
       return hint ? `${core} ${hint}` : core;
     }
-    if (msg) return msg;
+    if (msg && !/Could not validate Spotify token/i.test(msg)) return msg;
+    if (msg) return 'Spotify indisponible — réessaie.';
     return `Erreur Spotify${httpStatus ? ' (' + httpStatus + ')' : ''}`;
   }
 
@@ -2159,14 +2177,17 @@
 
   async function initSpotifySDK() {
     try {
-      // Use PKCE token from localStorage first, fallback to server session
-      let access_token = window._spotifyToken || localStorage.getItem('zpeed_spotify_token');
+      let access_token = window._spotifyToken;
       if (!access_token) {
-        const res = await fetch(spotifyTokenUrl());
+        const res = await fetch(spotifyTokenUrl(), { credentials: 'same-origin' });
         if (!res.ok) return;
         const data = await res.json();
         access_token = data.access_token;
         window._spotifyMockMode = !!data.use_mock_spotify;
+        if (access_token) {
+          window._spotifyToken = access_token;
+          localStorage.setItem('zpeed_spotify_token', access_token);
+        }
       }
       if (window._spotifyMockMode) {
         markSpotifyUnavailable('Spotify temporarily unavailable');

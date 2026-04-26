@@ -13,7 +13,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
-const { ensureSpotifyAccessToken } = require('./lib/spotifySession');
+const { ensureSpotifyAccessToken, applyTokenExpiry } = require('./lib/spotifySession');
 const {
   addHostSocket,
   removeHostSocket,
@@ -72,15 +72,22 @@ function spotifyApiFailure(res, status, stage, details = {}) {
       : stage === 'search.fetch' && status >= 400 && status < 500
       ? 'Spotify search was rejected. Check token, scopes, and Dashboard settings.'
       : 'Spotify request failed.');
-  return res.status(status || 502).json({ error: code, stage, message, details: mergedDetails });
+  const needSpotify = details.needSpotify === true;
+  const body = { error: code, stage, message, details: mergedDetails };
+  if (needSpotify) body.needSpotify = true;
+  return res.status(status || 502).json(body);
 }
 
 function spotifyEnsureFailure(res, ensure, stage) {
   const d = ensure.details;
+  const needSpotify = ['spotify_no_token', 'spotify_needs_reconnect', 'spotify_refresh_revoked', 'spotify_refresh_failed'].includes(
+    ensure.apiError
+  );
   return spotifyApiFailure(res, ensure.status || 401, stage, {
     ...(d && typeof d === 'object' && !Array.isArray(d) ? d : {}),
     ...(ensure.clientMessage ? { clientMessage: ensure.clientMessage } : {}),
-    ...(ensure.apiError ? { apiError: ensure.apiError } : {})
+    ...(ensure.apiError ? { apiError: ensure.apiError } : {}),
+    needSpotify
   });
 }
 
@@ -533,11 +540,13 @@ app.get('/auth/spotify/callback', async (req, res) => {
     // ── Pré-connexion (avant création de room) ─────────────────────────────────
     if (state && String(state).trim().toLowerCase() === SPOTIFY_PRECREATE_STATE) {
       const prev = req.session.pendingHostSpotify?.tokens || {};
+      const pendingTokens = {
+        access_token,
+        refresh_token: refresh_token || prev.refresh_token || undefined
+      };
+      applyTokenExpiry(pendingTokens, expires_in);
       req.session.pendingHostSpotify = {
-        tokens: {
-          access_token,
-          refresh_token: refresh_token || prev.refresh_token || undefined
-        },
+        tokens: pendingTokens,
         profile
       };
       return res.redirect('/index.html?spotify_ready=1');
@@ -547,11 +556,13 @@ app.get('/auth/spotify/callback', async (req, res) => {
     const stateKey = resolveSessionKey(state);
     if (stateKey && sessions[stateKey]) {
       const prev = sessions[stateKey].hostSpotify?.tokens || {};
+      const roomTokens = {
+        access_token,
+        refresh_token: refresh_token || prev.refresh_token || undefined
+      };
+      applyTokenExpiry(roomTokens, expires_in);
       sessions[stateKey].hostSpotify = {
-        tokens: {
-          access_token,
-          refresh_token: refresh_token || prev.refresh_token || undefined
-        },
+        tokens: roomTokens,
         profile
       };
       saveSessions();
@@ -587,15 +598,32 @@ app.get('/auth/spotify/callback', async (req, res) => {
 });
 
 // ── Return stored Spotify token to host client (Web Playback SDK) — requires hostSecret ──
-app.get('/api/spotify/token', (req, res) => {
+app.get('/api/spotify/token', async (req, res) => {
   const { code, secret } = req.query;
-  const s = sessions[resolveSessionKey(code)];
+  const roomKey = resolveSessionKey(code);
+  const s = sessions[roomKey];
   if (!secret || s?.hostSecret !== secret) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   if (!s?.hostSpotify?.tokens?.access_token) {
-    return res.status(404).json({ error: 'No Spotify token for this session' });
+    return res.status(404).json({
+      error: 'spotify_not_connected',
+      needSpotify: true,
+      message: 'Spotify doit être reconnecté.'
+    });
   }
+  const ensure = await ensureSpotifyAccessToken(s, process.env, { roomKey, stage: 'token.endpoint' });
+  if (!ensure.ok) {
+    const needSpotify = ['spotify_no_token', 'spotify_needs_reconnect', 'spotify_refresh_revoked', 'spotify_refresh_failed'].includes(
+      ensure.apiError
+    );
+    return res.status(ensure.status || 401).json({
+      error: ensure.apiError || 'spotify_token_invalid',
+      needSpotify,
+      message: ensure.clientMessage || 'Spotify indisponible — réessaie.'
+    });
+  }
+  if (ensure.refreshed) saveSessions();
   res.json({
     access_token: s.hostSpotify.tokens.access_token,
     profile: s.hostSpotify.profile || null,
@@ -608,7 +636,7 @@ app.get('/api/spotify/playlists', async (req, res) => {
   const roomKey = resolveSessionKey(code);
   const s = sessions[roomKey];
   if (!s?.hostSpotify?.tokens) return res.status(401).json({ error: 'Not connected' });
-  const ensure = await ensureSpotifyAccessToken(s, process.env);
+  const ensure = await ensureSpotifyAccessToken(s, process.env, { roomKey, stage: 'playlists.ensure_token' });
   if (!ensure.ok) {
     spotifyDiag('spotify_playlists_token_invalid', { code: roomKey, error: ensure.error });
     return spotifyEnsureFailure(res, ensure, 'playlists.ensure_token');
@@ -638,7 +666,7 @@ app.get('/api/spotify/playlist/:id', async (req, res) => {
   const roomKey = resolveSessionKey(code);
   const s = sessions[roomKey];
   if (!s?.hostSpotify?.tokens) return res.status(401).json({ error: 'Not connected' });
-  const ensure = await ensureSpotifyAccessToken(s, process.env);
+  const ensure = await ensureSpotifyAccessToken(s, process.env, { roomKey, stage: 'playlist_tracks.ensure_token' });
   if (!ensure.ok) {
     spotifyDiag('spotify_playlist_tracks_token_invalid', {
       code: roomKey,
@@ -1377,10 +1405,11 @@ app.get('/api/spotify/search', async (req, res) => {
   if (!s.hostSpotify?.tokens) {
     return res.status(401).json({
       error: 'spotify_not_connected',
-      message: 'Host has not connected Spotify for this room.'
+      needSpotify: true,
+      message: 'Spotify doit être reconnecté.'
     });
   }
-  const ensure = await ensureSpotifyAccessToken(s, process.env);
+  const ensure = await ensureSpotifyAccessToken(s, process.env, { roomKey, stage: 'search.ensure_token' });
   if (!ensure.ok) {
     spotifyDiag('spotify_search_token_invalid', {
       code: roomKey,
