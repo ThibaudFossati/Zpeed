@@ -1023,6 +1023,8 @@
       <div class="host-search-live--panel host-search-live--hero" id="hostSearchResults" role="region" aria-live="polite" aria-label="Résultats de recherche"></div>
     </div>
 
+    <div id="sourcesWidgetsGrid" class="sources-widgets-grid" aria-label="Raccourcis musique"></div>
+
     <!-- Playlists panel (inside platforms tab) -->
     <div id="playlistsPanel" style="display:none;margin-bottom:16px">
       <div class="platform-header">
@@ -2595,6 +2597,207 @@
     document.getElementById('hostSearchResults').innerHTML = '';
   }
 
+  let _sourcesQuickBusy = false;
+
+  window.hostSourcesAddFromQueue = function (encId) {
+    let trackId = encId;
+    try {
+      trackId = decodeURIComponent(String(encId || ''));
+    } catch (_) {}
+    const t = queue.find(x => String(x.id) === String(trackId));
+    if (t) hostAddTrack(t);
+  };
+
+  window.hostSourcesContributorTap = function (encUid) {
+    const raw = encUid ? decodeURIComponent(String(encUid)) : '';
+    if (raw) openSonderProfile(raw);
+    else switchTab('queue');
+  };
+
+  window.hostSourcesFocusSearch = function () {
+    const el = document.getElementById('hostSearchInput');
+    if (el) {
+      switchTab('platforms');
+      el.focus();
+    }
+  };
+
+  window.hostSourcesQuickAdd = async function (idx) {
+    if (_sourcesQuickBusy) return;
+    const seed = DEMO_TRACKS[Number(idx) % DEMO_TRACKS.length];
+    if (!seed) return;
+    _sourcesQuickBusy = true;
+    try {
+      const q = `${seed.title} ${seed.artist}`.trim();
+      const { tracks } = await fetchLiveSearchResults(q);
+      const pick =
+        tracks.find(
+          tr =>
+            String(tr.title || '')
+              .toLowerCase()
+              .includes(String(seed.title).slice(0, 4).toLowerCase())
+        ) || tracks[0];
+      if (pick) hostAddTrack(pick);
+      else showToast('Réessaie ou cherche manuellement');
+    } catch (_) {
+      showToast('Réessaie dans un instant');
+    } finally {
+      _sourcesQuickBusy = false;
+    }
+  };
+
+  function hostSourcesRecentSlice() {
+    const seen = new Set();
+    const arr = [...queue].sort((a, b) => (Number(b.arrivalOrder) || 0) - (Number(a.arrivalOrder) || 0));
+    const out = [];
+    for (const t of arr) {
+      if (!t || seen.has(t.id)) continue;
+      seen.add(t.id);
+      out.push(t);
+      if (out.length >= 6) break;
+    }
+    return out;
+  }
+
+  function hostSourcesTrendingSlice() {
+    return [...queue]
+      .sort((a, b) => (Number(b.likes) || 0) - (Number(a.likes) || 0))
+      .filter(t => t && (Number(t.likes) || 0) > 0)
+      .slice(0, 4);
+  }
+
+  function hostSourcesContributorPick() {
+    const counts = {};
+    const uidBy = {};
+    for (const g of guests || []) {
+      if (g && g.name) uidBy[String(g.name).trim().toLowerCase()] = g.userId ? String(g.userId) : '';
+    }
+    for (const t of queue) {
+      const pb = String(t.proposedBy || '').trim();
+      if (!pb || /sonder ai/i.test(pb)) continue;
+      counts[pb] = (counts[pb] || 0) + 1;
+    }
+    let bestName = null;
+    let best = 0;
+    for (const [n, c] of Object.entries(counts)) {
+      if (c > best) {
+        best = c;
+        bestName = n;
+      }
+    }
+    const uid = bestName ? uidBy[String(bestName).trim().toLowerCase()] || '' : '';
+    return { name: bestName, count: best, userId: uid };
+  }
+
+  function hostSourcesAiSlice() {
+    const ai = queue.filter(t => t && t.aiSuggested).slice(0, 2);
+    if (ai.length) return ai;
+    return hostSourcesTrendingSlice().slice(0, 2);
+  }
+
+  function renderSourcesWidgets() {
+    const root = document.getElementById('sourcesWidgetsGrid');
+    if (!root) return;
+
+    const recent = hostSourcesRecentSlice();
+    const trending = hostSourcesTrendingSlice();
+    const contrib = hostSourcesContributorPick();
+    const aiTracks = hostSourcesAiSlice();
+    const vibeLabel =
+      roomMeta && roomMeta.sessionVibe != null && String(roomMeta.sessionVibe).trim() !== ''
+        ? String(roomMeta.sessionVibe).trim()
+        : 'En cours';
+
+    const recentHtml = recent.length
+      ? `<div class="src-recent-grid">${recent
+          .map(t => {
+            const thumb = t.thumbnail || '';
+            const idEnc = encodeURIComponent(String(t.id));
+            return `<button type="button" class="src-recent-cell" onclick="hostSourcesAddFromQueue('${idEnc}')" aria-label="Ajouter ${escapeHtml(t.title || '')}">
+              <img src="${thumb}" alt="" onerror="this.onerror=null;this.src=typeof THUMB_FALLBACK!=='undefined'?THUMB_FALLBACK:''">
+            </button>`;
+          })
+          .join('')}</div>`
+      : `<button type="button" class="src-empty-tap" onclick="hostSourcesFocusSearch()">Cherche un son — tes derniers ajouts s’affichent ici</button>`;
+
+    const trendingHtml = trending.length
+      ? `<div class="src-trend-list">${trending
+          .map(t => {
+            const idEnc = encodeURIComponent(String(t.id));
+            return `<button type="button" class="src-trend-row" onclick="hostSourcesAddFromQueue('${idEnc}')">
+              <img class="src-trend-thumb" src="${t.thumbnail || ''}" alt="" onerror="this.onerror=null;this.src=THUMB_FALLBACK">
+              <div class="src-trend-text">
+                <div class="src-trend-title">${escapeHtml(t.title || '')}</div>
+                <div class="src-trend-meta">${escapeHtml(t.channel || '')} · ${Number(t.likes) || 0} ❤️</div>
+              </div>
+            </button>`;
+          })
+          .join('')}</div>`
+      : `<button type="button" class="src-empty-tap" onclick="hostSourcesFocusSearch()">Les titres les plus aimés apparaîtront ici</button>`;
+
+    const hostNm = localStorage.getItem('zpeed_hostName') || 'Hôte';
+    const contribHtml =
+      contrib.name && contrib.count > 0
+        ? `<button type="button" class="src-contrib-hit" onclick="hostSourcesContributorTap('${encodeURIComponent(contrib.userId || '')}')">
+            <img class="src-contrib-av" src="${avatarUrl(contrib.name, 96)}" alt="">
+            <div class="src-contrib-meta">
+              <div class="src-contrib-name">${escapeHtml(contrib.name)}</div>
+              <div class="src-contrib-sub">${contrib.count} proposition${contrib.count > 1 ? 's' : ''}</div>
+              <div class="src-contrib-tag">Influence la soirée</div>
+            </div>
+          </button>`
+        : `<button type="button" class="src-empty-tap" onclick="hostSourcesFocusSearch()">${escapeHtml(hostNm)} · invite des guests pour voir qui impose son style</button>`;
+
+    const aiHtml =
+      aiTracks.length > 0
+        ? `<div class="src-ai-list">${aiTracks
+            .map(t => {
+              const idEnc = encodeURIComponent(String(t.id));
+              return `<button type="button" class="src-ai-row" onclick="hostSourcesAddFromQueue('${idEnc}')">
+                <img class="src-ai-thumb" src="${t.thumbnail || ''}" alt="" onerror="this.onerror=null;this.src=THUMB_FALLBACK">
+                <div class="src-ai-text">
+                  <div class="src-ai-title">${escapeHtml(t.title || '')}</div>
+                  <div class="src-ai-artist">${escapeHtml(t.channel || '')}</div>
+                </div>
+              </button>`;
+            })
+            .join('')}</div>`
+        : `<button type="button" class="src-empty-tap" onclick="hostSourcesFocusSearch()">Ambiance détectée : ajoute des titres pour nourrir la session</button>`;
+
+    const quickHtml = [0, 1, 2, 3]
+      .map(
+        i => `
+      <button type="button" class="src-quick-chip" onclick="hostSourcesQuickAdd(${i})">
+        <span class="src-quick-title">${escapeHtml(DEMO_TRACKS[i].title)}</span>
+        <span class="src-quick-artist">${escapeHtml(DEMO_TRACKS[i].artist)}</span>
+      </button>`
+      )
+      .join('');
+
+    root.innerHTML = `
+      <section class="src-card src-card--recent">
+        <header class="src-card__head"><span class="src-card__label">Titres récents</span></header>
+        ${recentHtml}
+      </section>
+      <section class="src-card src-card--trending">
+        <header class="src-card__head"><span class="src-card__label">Tendance</span><span class="src-card__sub">Les plus aimés</span></header>
+        ${trendingHtml}
+      </section>
+      <section class="src-card src-card--contrib">
+        <header class="src-card__head"><span class="src-card__label">Top contributeur</span></header>
+        ${contribHtml}
+      </section>
+      <section class="src-card src-card--ai">
+        <header class="src-card__head"><span class="src-card__label">Ambiance détectée</span><span class="src-card__sub">${escapeHtml(vibeLabel)}</span></header>
+        ${aiHtml}
+      </section>
+      <section class="src-card src-card--quick src-card--span2">
+        <header class="src-card__head"><span class="src-card__label">Ajout rapide</span></header>
+        <div class="src-quick-grid">${quickHtml}</div>
+      </section>
+    `;
+  }
+
   async function loadPlaylistTracks(playlistId, playlistName) {
     document.getElementById('playlistsPanel').style.display = 'none';
     const panel = document.getElementById('playlistTracksPanel');
@@ -3209,6 +3412,7 @@
     document.getElementById('queueCount').textContent = queue.length ? `(${queue.length})` : '';
     if (!queue.length) {
       el.innerHTML = `<div class="empty"><div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div><div class="empty-text">File vide...</div></div>`;
+      renderSourcesWidgets();
       return;
     }
     el.innerHTML = queue.map((t, i) => {
@@ -3257,6 +3461,7 @@
         </div>
       `;
     }).join('');
+    renderSourcesWidgets();
   }
 
   function formatSonderPositiveStats(st) {
@@ -3474,6 +3679,7 @@
     const el = document.getElementById('guestsList');
     if (!guests.length) {
       el.innerHTML = `<div class="empty"><div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0-3-3.87"/></svg></div><div class="empty-text">Aucun guest pour l'instant.<br>Fais scanner le QR code !</div></div>`;
+      renderSourcesWidgets();
       return;
     }
     el.innerHTML = guests
@@ -3495,6 +3701,7 @@
       </div>`;
       })
       .join('');
+    renderSourcesWidgets();
   }
 
   function stringToColor(str) {
@@ -3635,6 +3842,7 @@
       renderSessionVibeHost();
       refreshSpotifyHostUi();
       renderQueue();
+      renderGuests();
       renderHostTop3();
       queue.forEach(t => {
         prevTrackSnap[t.id] = { v: t.votes | 0, s: t.status || 'pending' };
