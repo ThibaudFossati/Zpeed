@@ -1442,6 +1442,129 @@ body.zpeed-idle #queueList .queue-item.zpeed-nudge-target {
   color: rgba(255,255,255,0.62);
   letter-spacing: 0.01em;
 }
+.swipe-vote-wrap {
+  margin: 2px 0 12px;
+  display: grid;
+  place-items: center;
+}
+.swipe-vote-title {
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: rgba(255,255,255,0.88);
+}
+.swipe-vote-sub {
+  margin-top: 2px;
+  font-size: 0.68rem;
+  color: rgba(255,255,255,0.56);
+}
+.swipe-vote-card {
+  --swipe-like-opacity: 0;
+  --swipe-skip-opacity: 0;
+  margin-top: 8px;
+  width: min(92vw, 360px);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(25,29,42,0.95), rgba(15,18,29,0.95));
+  padding: 14px;
+  text-align: center;
+  transition: transform 0.22s ease, border-color 0.22s ease, background 0.22s ease;
+  touch-action: pan-y;
+  user-select: none;
+  position: relative;
+  overflow: hidden;
+}
+.swipe-vote-card.dragging {
+  transition: none;
+}
+.swipe-vote-card::before,
+.swipe-vote-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.swipe-vote-card::before {
+  background: linear-gradient(135deg, rgba(29,185,84,0.22), rgba(29,185,84,0.06));
+  opacity: var(--swipe-like-opacity);
+}
+.swipe-vote-card::after {
+  background: linear-gradient(225deg, rgba(255,94,125,0.24), rgba(255,94,125,0.06));
+  opacity: var(--swipe-skip-opacity);
+}
+.swipe-vote-cover {
+  width: min(76vw, 250px);
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.14);
+}
+.swipe-vote-track {
+  margin-top: 10px;
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: rgba(255,255,255,0.95);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.swipe-vote-artist {
+  margin-top: 3px;
+  font-size: 0.82rem;
+  color: rgba(255,255,255,0.68);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.swipe-vote-counts {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.74);
+}
+.swipe-vote-badge {
+  position: absolute;
+  top: 14px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  border: 1px solid currentColor;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.2);
+}
+.swipe-vote-badge--like {
+  left: 12px;
+  color: rgba(110,231,183,0.96);
+  opacity: var(--swipe-like-opacity);
+}
+.swipe-vote-badge--skip {
+  right: 12px;
+  color: rgba(255,132,155,0.96);
+  opacity: var(--swipe-skip-opacity);
+}
+.swipe-vote-actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+.swipe-vote-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.92);
+  font-size: 1rem;
+}
+.swipe-vote-btn--like { color: rgba(110,231,183,0.96); }
+.swipe-vote-btn--skip { color: rgba(255,132,155,0.96); }
+.swipe-vote-card.swipe-confirm-like {
+  border-color: rgba(110,231,183,0.62);
+}
+.swipe-vote-card.swipe-confirm-skip {
+  border-color: rgba(255,132,155,0.62);
+}
 .collective-trigger-btn {
   border: 1px solid rgba(167,139,250,0.4);
   background: rgba(167,139,250,0.12);

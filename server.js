@@ -116,6 +116,10 @@ function ensureTrackModel(track, session) {
   if (!track.spotifyUri && track.spotifyId) track.spotifyUri = `spotify:track:${track.spotifyId}`;
   if (!track.youtubeId && track.videoId) track.youtubeId = track.videoId;
   if (!track.proposedAt) track.proposedAt = new Date().toISOString();
+  if (!Number.isFinite(track.likes)) track.likes = 0;
+  if (!Number.isFinite(track.skips)) track.skips = 0;
+  if (!Array.isArray(track.likedBy)) track.likedBy = [];
+  if (!Array.isArray(track.skippedBy)) track.skippedBy = [];
   return track;
 }
 
@@ -1768,6 +1772,43 @@ io.on('connection', (socket) => {
 
   socket.on('track:vote', async ({ code, trackId, guestId, guestName, userName, vote, hostId }) => {
     return;
+  });
+
+  socket.on('track:swipe', async ({ code, trackId, direction, guestId, guestName, userName, hostId }) => {
+    const s = sessions[code];
+    if (!s) return;
+    const track = s.queue.find(t => t.id === trackId);
+    if (!track) return;
+    const voterKey =
+      guestId ||
+      (hostId && s.hostId === hostId ? `host:${s.hostId}` : null) ||
+      voterKeyForSocket(s, socket);
+    if (!voterKey) return;
+    ensureTrackModel(track, s);
+    if (track.likedBy.includes(voterKey) || track.skippedBy.includes(voterKey)) return;
+
+    if (direction === 'like') {
+      track.likes += 1;
+      track.likedBy.push(voterKey);
+    } else if (direction === 'skip') {
+      track.skips += 1;
+      track.skippedBy.push(voterKey);
+    } else {
+      return;
+    }
+
+    sortQueueForUi(s);
+    tryAcceptSpotifyTracks(s, io, code, saveSessions);
+    await ensureQueueDepth(s, code, io, saveSessions, 2);
+    io.to(`session:${code}`).emit('queue:update', { queue: s.queue, meta: metaForRoom(s) });
+    io.to(`session:${code}`).emit('track:swiped', {
+      trackId,
+      direction,
+      actor: guestName || userName || 'Someone',
+      likes: track.likes || 0,
+      skips: track.skips || 0
+    });
+    tickSpotifyPipeline({ session: s, code, io, processEnv: process.env, saveSessions }).catch(() => {});
   });
 
   socket.on('track:react', ({ code, trackId, guestId, guestName, emoji }) => {

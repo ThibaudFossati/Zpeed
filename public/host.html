@@ -998,7 +998,7 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
           <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.623.623 0 0 1-.857.207c-2.348-1.435-5.304-1.759-8.785-.964a.623.623 0 1 1-.277-1.215c3.809-.87 7.076-.496 9.712 1.115a.623.623 0 0 1 .207.857zm1.223-2.722a.78.78 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.78.78 0 0 1-.973-.52.781.781 0 0 1 .52-.973c3.632-1.102 8.147-.568 11.233 1.329a.78.78 0 0 1 .257 1.073zm.105-2.835C14.692 8.95 9.375 8.775 6.297 9.71a.937.937 0 1 1-.543-1.793c3.532-1.072 9.404-.865 13.115 1.338a.937.937 0 0 1-.954 1.612z"/>
         </svg>
-        <span id="spotify-btn-label">Connecter Spotify</span>
+        <span id="spotify-btn-label">Spotify</span>
         <span id="status-spotify" style="width:7px;height:7px;border-radius:50%;background:transparent;display:none;flex-shrink:0"></span>
       </button>
     </div>
@@ -1017,7 +1017,7 @@
       </div>
       <div class="host-search-live--panel" id="hostSearchResults" role="region" aria-live="polite" aria-label="Résultats de recherche"></div>
     </div>
-    <p class="sources-search-hint" id="sourcesSearchHint">Recherche un titre à ajouter à la soirée</p>
+    <p class="sources-search-hint" id="sourcesSearchHint">Ajoute un titre en 1 clic</p>
 
     <!-- Playlists panel (inside platforms tab) -->
     <div id="playlistsPanel" style="display:none;margin-bottom:16px">
@@ -1040,12 +1040,13 @@
   <!-- ═══ PANEL : QUEUE ═══ -->
   <div class="tab-panel" id="panel-queue">
     <div class="section-title" style="display:flex;align-items:center;gap:7px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.6;flex-shrink:0"><rect x="3" y="4" width="18" height="2.5" rx="1.25"/><rect x="3" y="10.75" width="18" height="2.5" rx="1.25"/><rect x="3" y="17.5" width="12" height="2.5" rx="1.25"/></svg> File d'attente <span id="queueCount" style="color:var(--purple-light)"></span></div>
-    <div class="queue-flow-tagline">La meilleure musique du groupe joue, en continu</div>
+    <div class="queue-flow-tagline">La musique continue, sans coupure</div>
+    <div id="swipeVoteWrap" class="swipe-vote-wrap"></div>
     <div id="zpeedHostTop3" class="zpeed-top3-wrap" aria-live="polite"></div>
     <div id="queueList">
       <div class="empty">
         <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
-        <div class="empty-text">En attente de propositions des guests...</div>
+        <div class="empty-text">Ajoute un titre pour démarrer</div>
       </div>
     </div>
   </div>
@@ -1071,7 +1072,7 @@
   <!-- ═══ APPLE MUSIC PLAYER BAR ═══ -->
   <div class="am-bar" id="amBar">
     <div class="am-playback-hint" id="amPlaybackHint" hidden></div>
-    <button type="button" class="am-activate-btn" id="amActivateMusicBtn" onclick="activateSound()" hidden>Activer le son</button>
+    <button type="button" class="am-activate-btn" id="amActivateMusicBtn" onclick="activateSound()" hidden>Lancer la musique</button>
     <div class="am-bar-row">
       <div class="am-transport">
         <button type="button" class="am-btn" id="amPrevBtn" onclick="carouselPrev()" aria-label="Titre précédent">
@@ -1570,7 +1571,7 @@
     }
     btn.disabled = false;
     if (_activateSoundAttempt >= 3) btn.textContent = 'Réessayer';
-    else btn.textContent = 'Activer le son';
+    else btn.textContent = 'Lancer la musique';
   }
 
   async function waitForSpotifyDeviceReady(timeoutMs) {
@@ -1764,30 +1765,30 @@
     spotifyActivationUiPending(true);
     try {
       if (!pickedTrack) {
-        showToast('Ajoute un titre pour lancer la musique');
+        showToast('Ajoute un titre');
         return;
       }
       if (st === 'no_spotify') {
         const ytOk = await tryYouTubeFallback(pickedTrack);
         if (ytOk) {
-          showToast('Lecture directe activée');
+          showToast('Lecture lancée');
           return;
         }
         connectPlatform('spotify');
-        showToast('Ajoute un titre pour lancer la musique');
+        showToast('Ajoute un titre');
         return;
       }
       const spotifyOk = await trySpotifyActivation(pickedTrack);
       if (spotifyOk) {
-        showToast('SONDER contrôle la musique');
+        showToast('Musique lancée');
         return;
       }
       const ytOk = await tryYouTubeFallback(pickedTrack);
       if (ytOk) {
-        showToast('Lecture directe activée');
+        showToast('Lecture lancée');
         return;
       }
-      showToast('Ajoute un titre pour lancer la musique');
+      showToast('Ajoute un titre');
     } finally {
       spotifyActivationUiPending(false);
       refreshSpotifyHostUi();
@@ -1813,14 +1814,14 @@
     }
     if (sourceHelper && _activeAudioSource === 'youtube') {
       sourceHelper.hidden = false;
-      sourceHelper.textContent = 'Lecture directe dans l’app';
+      sourceHelper.textContent = 'Lecture directe';
     } else if (sourceHelper && _activeAudioSource === 'spotify') {
       sourceHelper.hidden = false;
       sourceHelper.textContent = 'Lecture via Spotify';
     }
     if (activateBtn) {
       activateBtn.hidden = !(st === 'needs_device' || st === 'no_spotify');
-      activateBtn.textContent = st === 'no_spotify' ? 'Connecter Spotify' : (_activateSoundAttempt >= 3 ? 'Réessayer' : 'Activer le son');
+      activateBtn.textContent = st === 'no_spotify' ? 'Connecter Spotify' : (_activateSoundAttempt >= 3 ? 'Réessayer' : 'Lancer la musique');
       activateBtn.disabled = _activateSoundPending;
     }
     ['amPrevBtn', 'amPlayBtn', 'amSkipBtn', 'amVolumeBtn'].forEach(id => {
@@ -1858,7 +1859,7 @@
         };
       } else if (st === 'needs_device') {
         hint.hidden = false;
-        hint.textContent = 'Ouvre Spotify sur ton téléphone ou ordinateur, puis choisis SONDER comme appareil.';
+        hint.textContent = 'Ouvre Spotify puis choisis SONDER.';
         hint.classList.add('am-playback-hint--tap');
         hint.setAttribute('role', 'button');
         hint.tabIndex = 0;
@@ -1871,7 +1872,7 @@
         };
       } else if (st === 'no_spotify') {
         hint.hidden = false;
-        hint.textContent = 'Connecte Spotify puis appuie sur le bouton pour lancer la musique.';
+        hint.textContent = 'Connecte Spotify puis appuie sur "Lancer la musique".';
       } else if (st === 'rate_limited') {
         hint.hidden = false;
         hint.textContent = 'Spotify limite les requêtes. Réessaie dans quelques minutes.';
@@ -2027,7 +2028,7 @@
     const devReady = hostSpotifyPlaybackDeviceReady();
     if (serverNeeds && !devReady) {
       warn.style.display = 'block';
-      warn.textContent = 'Ouvre Spotify sur ton téléphone ou ordinateur, puis choisis SONDER comme appareil.';
+      warn.textContent = 'Ouvre Spotify puis choisis SONDER.';
     } else {
       warn.style.display = 'none';
       warn.textContent = '';
@@ -2932,6 +2933,16 @@
     else b.classList.remove('show');
   });
 
+  socket.on('track:swiped', ({ direction }) => {
+    const card = document.getElementById('swipeVoteCard');
+    if (!card) return;
+    if (direction === 'like') card.classList.add('swipe-confirm-like');
+    if (direction === 'skip') card.classList.add('swipe-confirm-skip');
+    setTimeout(() => {
+      card.classList.remove('swipe-confirm-like', 'swipe-confirm-skip');
+    }, 260);
+  });
+
   socket.on('track:playing', async ({ track, fromServer }) => {
     currentTrack = track;
     renderNowPlaying();
@@ -3113,6 +3124,7 @@
 
   function renderQueue() {
     const el = document.getElementById('queueList');
+    renderSwipeVoteCard();
     document.getElementById('queueCount').textContent = queue.length ? `(${queue.length})` : '';
     if (!queue.length) {
       el.innerHTML = `<div class="empty"><div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div><div class="empty-text">File vide...</div></div>`;
@@ -3133,11 +3145,11 @@
         ? '<span class="queue-diff-badge queue-diff-badge--ai">Auto-DJ</span>'
         : '';
       const diffBadges = `<div class="queue-diff-badges">${stateBadge}${aiBadge}</div>`;
+      const likes = Number(t.likes) || 0;
+      const skips = Number(t.skips) || 0;
       const voteLabel = isPlayingNow
         ? 'En lecture'
-        : t.aiSuggested
-          ? 'Lecture continue auto'
-          : 'Prêt à jouer';
+        : `❤️ ${likes}  ·  ❌ ${skips}`;
       const voteLabelClass = isPlayingNow
         ? 'queue-vote-status queue-vote-status--playing'
         : 'queue-vote-status queue-vote-status--pending';
@@ -3162,6 +3174,103 @@
         </div>
       `;
     }).join('');
+  }
+
+  let _swipeGesture = null;
+
+  function applySwipeCardTransform(x, w) {
+    const card = document.getElementById('swipeVoteCard');
+    if (!card) return;
+    const ratio = Math.max(-1, Math.min(1, x / Math.max(140, w || 1)));
+    card.style.transform = `translateX(${x}px) rotate(${ratio * 8}deg)`;
+    card.style.setProperty('--swipe-like-opacity', ratio > 0 ? String(Math.min(1, ratio * 1.8)) : '0');
+    card.style.setProperty('--swipe-skip-opacity', ratio < 0 ? String(Math.min(1, Math.abs(ratio) * 1.8)) : '0');
+  }
+
+  function submitSwipeVote(trackId, direction) {
+    if (!trackId || !direction) return;
+    socket.emit('track:swipe', { code, trackId, direction, hostId });
+  }
+
+  function finalizeSwipeGesture(deltaX) {
+    const card = document.getElementById('swipeVoteCard');
+    if (!card) return;
+    const trackId = card.dataset.trackId;
+    const threshold = 78;
+    if (deltaX > threshold) {
+      card.classList.add('swipe-like');
+      applySwipeCardTransform(420, 220);
+      submitSwipeVote(trackId, 'like');
+      showToast('❤️ Track liké');
+      return;
+    }
+    if (deltaX < -threshold) {
+      card.classList.add('swipe-skip');
+      applySwipeCardTransform(-420, 220);
+      submitSwipeVote(trackId, 'skip');
+      showToast('❌ Track passé');
+      return;
+    }
+    card.classList.remove('swipe-like', 'swipe-skip');
+    card.style.transform = '';
+    card.style.setProperty('--swipe-like-opacity', '0');
+    card.style.setProperty('--swipe-skip-opacity', '0');
+  }
+
+  function bindSwipeVoteCard() {
+    const card = document.getElementById('swipeVoteCard');
+    if (!card) return;
+    card.onpointerdown = (e) => {
+      _swipeGesture = { startX: e.clientX, deltaX: 0 };
+      card.classList.add('dragging');
+      if (card.setPointerCapture) card.setPointerCapture(e.pointerId);
+    };
+    card.onpointermove = (e) => {
+      if (!_swipeGesture) return;
+      _swipeGesture.deltaX = e.clientX - _swipeGesture.startX;
+      applySwipeCardTransform(_swipeGesture.deltaX, card.offsetWidth);
+    };
+    card.onpointerup = () => {
+      if (!_swipeGesture) return;
+      const dx = _swipeGesture.deltaX;
+      _swipeGesture = null;
+      card.classList.remove('dragging');
+      finalizeSwipeGesture(dx);
+    };
+    card.onpointercancel = () => {
+      _swipeGesture = null;
+      card.classList.remove('dragging');
+      finalizeSwipeGesture(0);
+    };
+  }
+
+  function renderSwipeVoteCard() {
+    const wrap = document.getElementById('swipeVoteWrap');
+    if (!wrap) return;
+    const track = queue && queue.length ? queue[0] : null;
+    if (!track) {
+      wrap.innerHTML = '';
+      return;
+    }
+    const likes = Number(track.likes) || 0;
+    const skips = Number(track.skips) || 0;
+    wrap.innerHTML = `
+      <div class="swipe-vote-title">Swipe pour voter</div>
+      <div class="swipe-vote-sub">Droite ❤️ Like · Gauche ❌ Skip</div>
+      <div class="swipe-vote-card" id="swipeVoteCard" data-track-id="${track.id}">
+        <span class="swipe-vote-badge swipe-vote-badge--like">❤️ LIKE</span>
+        <span class="swipe-vote-badge swipe-vote-badge--skip">❌ SKIP</span>
+        <img class="swipe-vote-cover" src="${track.thumbnail || THUMB_FALLBACK}" alt="${track.title || 'Track'}" onerror="this.onerror=null;this.src=THUMB_FALLBACK">
+        <div class="swipe-vote-track">${track.title || 'Track'}</div>
+        <div class="swipe-vote-artist">${track.channel || 'SONDER'}</div>
+        <div class="swipe-vote-counts">❤️ ${likes} · ❌ ${skips}</div>
+        <div class="swipe-vote-actions">
+          <button type="button" class="swipe-vote-btn swipe-vote-btn--skip" onclick="submitSwipeVote('${track.id}','skip')">❌</button>
+          <button type="button" class="swipe-vote-btn swipe-vote-btn--like" onclick="submitSwipeVote('${track.id}','like')">❤️</button>
+        </div>
+      </div>
+    `;
+    bindSwipeVoteCard();
   }
 
   function renderGuests() {
