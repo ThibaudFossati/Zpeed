@@ -2679,10 +2679,6 @@ body.sonder-host .track-ticker-bar {
   display: none;
 }
 
-body.sonder-host #panel-queue > .queue-flow-tagline:first-of-type {
-  display: none;
-}
-
 body.sonder-ui #panel-queue .section-title {
   font-size: clamp(0.72rem, 2.5vw, 0.82rem);
   font-weight: 800;
@@ -3460,4 +3456,499 @@ body.sonder-host #panel-platforms .src-empty-tap {
 body.sonder-host #panel-platforms .src-empty-tap:active {
   background: rgba(255, 255, 255, 0.06);
   color: var(--text);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Host — modular cards (Queue, Live, Guests, QR) flat, cohérent avec Sources
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+body.sonder-host .host-tab-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: min(100%, var(--max-app, 680px));
+  margin: 0 auto;
+  padding-bottom: 8px;
+}
+
+@media (min-width: 640px) {
+  body.sonder-host #panel-guests .host-guests-list:has(.guest-card) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+}
+
+body.sonder-host .host-card {
+  border-radius: var(--radius-card);
+  padding: 16px 16px 14px;
+  border: 1px solid var(--border2);
+  box-shadow: none;
+  background: linear-gradient(165deg, rgba(34, 34, 42, 0.96) 0%, rgba(12, 12, 18, 0.99) 100%);
+}
+
+body.sonder-host .host-card--queue-head {
+  background: linear-gradient(155deg, rgba(32, 36, 44, 0.98) 0%, rgba(14, 14, 22, 0.99) 100%);
+}
+
+body.sonder-host .host-card--swipe-primary {
+  padding: 12px 12px 14px;
+  background: linear-gradient(175deg, rgba(26, 30, 40, 0.98) 0%, rgba(10, 10, 16, 0.99) 100%);
+}
+
+body.sonder-host .host-card--queue-list {
+  padding: 10px 12px 12px;
+  background: linear-gradient(180deg, rgba(20, 20, 28, 0.95) 0%, rgba(10, 10, 14, 0.99) 100%);
+}
+
+body.sonder-host .host-card__head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+body.sonder-host .host-card__title {
+  margin: 0;
+  font-family: 'Roboto', sans-serif;
+  font-size: clamp(1.05rem, 3.2vw, 1.2rem);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+body.sonder-host .host-count-pill {
+  flex-shrink: 0;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--bg);
+  background: var(--text);
+  border: 1px solid var(--border2);
+}
+
+body.sonder-host .host-count-pill:empty {
+  display: none;
+}
+
+body.sonder-host .host-card__lede {
+  margin: 0 0 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text2);
+  line-height: 1.35;
+}
+
+body.sonder-host .host-card__lede--tight {
+  margin-bottom: 4px;
+}
+
+body.sonder-host .host-card__micro {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text2);
+  line-height: 1.35;
+}
+
+body.sonder-host .host-card__vibe .host-vibe-line,
+body.sonder-host .host-card__vibe .queue-flow-sub {
+  margin: 0;
+}
+
+body.sonder-host .host-card__vibe .host-vibe-line {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+body.sonder-host .host-card__vibe .queue-flow-sub {
+  margin-top: 4px;
+  font-size: 0.78rem;
+}
+
+body.sonder-host .host-card__label-row {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text2);
+  margin-bottom: 10px;
+}
+
+body.sonder-host .host-card__top3 {
+  margin-top: 4px;
+}
+
+body.sonder-host .host-card__top3 .zpeed-top3 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+body.sonder-host .host-card__top3 .zpeed-top3-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 5px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border2);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text2);
+}
+
+/* —— Queue : swipe principal —— */
+body.sonder-host #panel-queue .swipe-vote-wrap--host-primary {
+  margin: 0;
+  width: 100%;
+}
+
+body.sonder-host #panel-queue .swipe-vote-hint--host {
+  width: 100%;
+  max-width: none;
+  margin-bottom: 4px;
+}
+
+body.sonder-host #panel-queue .swipe-vote-card--host-xl {
+  width: 100%;
+  max-width: 420px;
+  margin-top: 4px;
+  border-radius: var(--radius-card);
+  box-shadow: none;
+}
+
+body.sonder-host #panel-queue .swipe-vote-cover--host-xl {
+  width: min(78vw, 300px);
+  max-width: 100%;
+  border-radius: var(--radius);
+}
+
+body.sonder-host #panel-queue .swipe-vote-track {
+  font-size: clamp(1.05rem, 3.5vw, 1.25rem);
+}
+
+body.sonder-host #panel-queue .swipe-vote-actions--host-labeled {
+  width: 100%;
+  justify-content: stretch;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+body.sonder-host #panel-queue .swipe-vote-btn--wide {
+  flex: 1;
+  width: auto;
+  height: auto;
+  min-height: 52px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+body.sonder-host #panel-queue .swipe-vote-btn__txt {
+  letter-spacing: 0.02em;
+}
+
+/* —— Queue : liste secondaire —— */
+body.sonder-host #panel-queue .host-queue-list-inner .queue-item--host-compact {
+  border-radius: var(--radius);
+  box-shadow: none !important;
+}
+
+body.sonder-host #panel-queue .host-queue-list-inner .queue-item.track-card.zpeed-heat-med,
+body.sonder-host #panel-queue .host-queue-list-inner .queue-item.track-card.zpeed-heat-high,
+body.sonder-host #panel-queue .host-queue-list-inner .queue-item.track-card.zpeed-heat-blaze {
+  box-shadow: none !important;
+}
+
+body.sonder-host #panel-queue .host-queue-list-inner .host-q-idx {
+  display: none !important;
+}
+
+body.sonder-host #panel-queue .host-queue-list-inner .queue-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+}
+
+body.sonder-host #panel-queue .host-queue-list-inner .queue-info--host-compact {
+  flex: 1;
+  min-width: 0;
+}
+
+body.sonder-host #panel-queue .host-queue-list-inner .queue-title {
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+body.sonder-host #panel-queue .host-queue-list-inner .queue-meta {
+  font-size: 0.78rem;
+}
+
+body.sonder-host #panel-queue .queue-vote-status {
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+body.sonder-host #panel-queue .queue-vote-status--playing {
+  color: var(--purple-light);
+}
+
+body.sonder-host #panel-queue .queue-vote-status--validated {
+  color: rgba(52, 211, 153, 0.95);
+}
+
+body.sonder-host #panel-queue .voter-avatars--host-queue {
+  display: none;
+}
+
+body.sonder-host #panel-queue .queue-item--host-compact .zpeed-validated-tag {
+  opacity: 0;
+  transform: scale(0.85);
+}
+
+body.sonder-host #panel-queue .queue-item--validated-show .zpeed-validated-tag {
+  opacity: 1;
+  transform: scale(1);
+}
+
+body.sonder-host #panel-queue .queue-item--actions--host-compact {
+  flex-direction: column;
+  gap: 6px;
+  align-self: center;
+}
+
+body.sonder-host #panel-queue .queue-item--actions--host-compact .queue-related-btn {
+  font-size: 0.72rem;
+  padding: 6px 10px;
+}
+
+/* —— Live —— */
+body.sonder-host .host-card--live-hero {
+  padding: 20px 16px 18px;
+}
+
+body.sonder-host .host-card--live-vibe {
+  padding: 12px 14px;
+  background: linear-gradient(150deg, rgba(28, 40, 56, 0.55) 0%, rgba(14, 14, 22, 0.99) 100%);
+}
+
+body.sonder-host .live-stack--minimal {
+  gap: 10px;
+  padding: 0;
+  flex: none;
+}
+
+body.sonder-host .live-hero--object {
+  max-width: 100%;
+  gap: 0.5rem;
+}
+
+body.sonder-host .live-hero--object .live-hero__title {
+  font-size: clamp(1.45rem, 5.5vw, 2.1rem);
+}
+
+body.sonder-host .live-hero--object .live-hero__artist {
+  font-size: clamp(0.92rem, 3vw, 1.1rem);
+}
+
+body.sonder-host .live-source-chip {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text2);
+  border: 1px solid var(--border2);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+body.sonder-host .live-source-chip:empty {
+  display: none;
+}
+
+body.sonder-host .live-panel-cta {
+  margin-top: 14px;
+  width: 100%;
+  max-width: 320px;
+  min-height: 52px;
+  border-radius: 14px;
+  border: 1px solid var(--border2);
+  background: var(--text);
+  color: var(--bg);
+  font-family: 'Roboto', sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+body.sonder-host .live-panel-cta:disabled {
+  opacity: 0.55;
+}
+
+body.sonder-host[data-host-tab='playing'] .am-bar .am-utilities {
+  display: none;
+}
+
+/* —— Guests —— */
+body.sonder-host #panel-guests .host-guests-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+body.sonder-host #panel-guests .guest-card {
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-card);
+  padding: 12px 14px;
+  margin: 0;
+  background: linear-gradient(160deg, rgba(36, 34, 48, 0.92) 0%, rgba(14, 14, 20, 0.99) 100%);
+  box-shadow: none;
+}
+
+body.sonder-host #panel-guests .guest-card__av {
+  width: 52px;
+  height: 52px;
+  box-shadow: none;
+  border: 1px solid var(--border2);
+}
+
+body.sonder-host #panel-guests .guest-card__body {
+  flex: 1;
+  min-width: 0;
+}
+
+body.sonder-host #panel-guests .guest-card__name {
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+}
+
+body.sonder-host #panel-guests .guest-card__role {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text2);
+  margin-top: 2px;
+}
+
+body.sonder-host #panel-guests .guest-card__vibe {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.72);
+  line-height: 1.3;
+}
+
+body.sonder-host #panel-guests .guest-card__live {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--purple-light);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+body.sonder-host #panel-guests .host-card--magic-invite {
+  padding: 12px 14px;
+}
+
+body.sonder-host #panel-guests .magic-invite-host-title {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text2);
+  margin-bottom: 8px;
+}
+
+body.sonder-host #panel-guests .magic-invite-row {
+  padding: 10px 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.2);
+  margin-bottom: 6px;
+}
+
+body.sonder-host #panel-guests .magic-invite-row:last-child {
+  margin-bottom: 0;
+}
+
+body.sonder-host .host-guest-share-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+body.sonder-host .btn--host-compact {
+  min-height: 48px;
+  border-radius: 12px;
+  font-weight: 700;
+}
+
+/* —— QR compact —— */
+body.sonder-host #panel-qr .host-tab-stack--qr {
+  gap: 12px;
+  padding-top: 4px;
+}
+
+body.sonder-host #panel-qr .host-card--qr-compact {
+  padding: 14px;
+}
+
+body.sonder-host #panel-qr .qr-minimal--compact {
+  gap: 12px;
+  padding: 0;
+}
+
+body.sonder-host #panel-qr .qr-code-pill {
+  font-size: clamp(0.95rem, 3.5vw, 1.05rem);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-indent: 0;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border2);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+
+body.sonder-host #panel-qr .qr-url-hint--compact {
+  font-size: 0.72rem;
+  padding: 0 4px;
+}
+
+body.sonder-host #panel-qr .qr-actions-stack--compact {
+  max-width: 280px;
+  gap: 8px;
+  margin-top: 0;
+}
+
+body.sonder-host .btn--qr-primary {
+  width: 100%;
+}
+
+body.sonder-host .btn-ghost-danger {
+  background: transparent;
+  border: 1px dashed rgba(239, 68, 68, 0.35);
+  color: rgba(248, 113, 113, 0.88);
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+
+body.sonder-host .btn-ghost-danger:active {
+  background: rgba(239, 68, 68, 0.08);
 }

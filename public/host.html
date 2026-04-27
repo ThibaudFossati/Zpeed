@@ -909,7 +909,7 @@
   <script src="notif.js"></script>
   <script src="observatory.js"></script>
 </head>
-<body class="sonder-ui sonder-host">
+<body class="sonder-ui sonder-host" data-host-tab="platforms">
 <div class="container with-player-bar">
 
   <!-- BETA BANNER -->
@@ -1045,38 +1045,53 @@
 
   <!-- ═══ PANEL : QUEUE ═══ -->
   <div class="tab-panel" id="panel-queue">
-    <div class="section-title" style="display:flex;align-items:center;gap:7px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.6;flex-shrink:0"><rect x="3" y="4" width="18" height="2.5" rx="1.25"/><rect x="3" y="10.75" width="18" height="2.5" rx="1.25"/><rect x="3" y="17.5" width="12" height="2.5" rx="1.25"/></svg> File d'attente <span id="queueCount" style="color:var(--purple-light)"></span></div>
-    <div class="queue-flow-tagline">La musique continue, sans coupure</div>
-    <div class="session-vibe-block">
-      <div id="sessionVibeHost" class="queue-flow-tagline">Ambiance : Mix</div>
-      <div id="sessionVibeHostSub" class="queue-flow-sub">Basé sur les personnes présentes</div>
-    </div>
-    <div id="swipeVoteWrap" class="swipe-vote-wrap"></div>
-    <div id="zpeedHostTop3" class="zpeed-top3-wrap" aria-live="polite"></div>
-    <div id="magicInviteHost" class="magic-invite-host" style="display:none" aria-live="polite"></div>
-    <div id="queueList">
-      <div class="empty">
-        <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
-        <div class="empty-text">Ajoute un titre pour démarrer</div>
-      </div>
+    <div class="host-tab-stack host-tab-stack--queue">
+      <section class="host-card host-card--queue-head" aria-labelledby="queueHeadTitle">
+        <div class="host-card__head-row">
+          <h2 class="host-card__title" id="queueHeadTitle">File d’attente</h2>
+          <span class="host-count-pill" id="queueCount" aria-live="polite"></span>
+        </div>
+        <p class="host-card__lede">La musique continue, sans coupure</p>
+        <div class="session-vibe-block host-card__vibe">
+          <div id="sessionVibeHost" class="queue-flow-tagline host-vibe-line">Ambiance : Mix</div>
+          <div id="sessionVibeHostSub" class="queue-flow-sub">Basé sur les personnes présentes</div>
+        </div>
+        <div id="zpeedHostTop3" class="zpeed-top3-wrap host-card__top3" aria-live="polite"></div>
+      </section>
+      <section class="host-card host-card--swipe-primary" aria-label="Vote sur le prochain titre">
+        <div id="swipeVoteWrap" class="swipe-vote-wrap swipe-vote-wrap--host-primary"></div>
+      </section>
+      <section class="host-card host-card--queue-list" aria-label="Titres en file">
+        <div id="queueList" class="host-queue-list-inner">
+          <div class="empty">
+            <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
+            <div class="empty-text">Ajoute un titre pour démarrer</div>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 
-  <!-- ═══ PANEL : EN COURS — flat live hero + observatory (hidden, logic preserved) ═══ -->
+  <!-- ═══ PANEL : EN COURS — minimal music object ═══ -->
   <div class="tab-panel" id="panel-playing">
-
-    <div class="live-stack">
-      <div id="liveMockPill" class="live-mock-pill live-pill" role="status" aria-live="polite">Mode test</div>
-      <div id="liveSpotifyDeviceWarn" class="live-spotify-device-warn live-pill" role="status" aria-live="polite"></div>
-      <div class="live-hero">
-        <img id="liveHeroArt" class="live-hero__art" alt="" decoding="async" width="320" height="320" src="">
-        <div class="live-hero__title" id="liveHeroTitle">—</div>
-        <div class="live-hero__artist" id="liveHeroArtist">—</div>
-        <div class="live-meta" aria-live="polite">
-          <div id="sessionVibeHostLive" class="live-meta__line">—</div>
-          <div id="liveSourceLine" class="live-meta__line live-meta__line--dim"></div>
+    <div class="host-tab-stack host-tab-stack--live">
+      <section class="host-card host-card--live-hero">
+        <div class="live-stack live-stack--minimal">
+          <div id="liveMockPill" class="live-mock-pill live-pill" role="status" aria-live="polite">Mode test</div>
+          <div id="liveSpotifyDeviceWarn" class="live-spotify-device-warn live-pill" role="status" aria-live="polite"></div>
+          <div class="live-hero live-hero--object">
+            <img id="liveHeroArt" class="live-hero__art" alt="" decoding="async" width="320" height="320" src="">
+            <div class="live-hero__title" id="liveHeroTitle">—</div>
+            <div class="live-hero__artist" id="liveHeroArtist">—</div>
+            <div id="liveSourceLine" class="live-source-chip" aria-live="polite"></div>
+            <button type="button" class="live-panel-cta" id="livePanelActivateBtn" onclick="activateSound()" hidden>Activer le son</button>
+          </div>
         </div>
-      </div>
+      </section>
+      <section class="host-card host-card--live-vibe" aria-label="Ambiance de la session">
+        <div id="liveVibeCardLine" class="host-card__lede host-card__lede--tight">Ambiance : En cours</div>
+        <div id="liveVibeCardSub" class="host-card__micro">Basé sur les personnes présentes</div>
+      </section>
     </div>
 
     <!-- Observatory spatial visualization (kept for window.obs; visually hidden) -->
@@ -1160,35 +1175,46 @@
 
   <!-- ═══ PANEL : GUESTS ═══ -->
   <div class="tab-panel" id="panel-guests">
-    <div class="section-title" style="display:flex;align-items:center;gap:7px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.6;flex-shrink:0"><circle cx="9" cy="7" r="3.8"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.5a3.8 3.8 0 0 1 0 7"/><path d="M21 21v-2a4 4 0 0 0-3-3.9"/></svg> Participants <span id="guestCountDisplay" style="color:var(--purple-light)"></span></div>
-    <div id="guestsList">
-      <div class="empty">
-        <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0-3-3.87"/></svg></div>
-        <div class="empty-text">Aucun guest pour l'instant.<br>Fais scanner le QR code !</div>
+    <div class="host-tab-stack host-tab-stack--guests">
+      <section class="host-card host-card--guests-head" aria-labelledby="guestsHeadTitle">
+        <div class="host-card__head-row">
+          <h2 class="host-card__title" id="guestsHeadTitle">Participants</h2>
+          <span class="host-count-pill" id="guestCountDisplay" aria-live="polite"></span>
+        </div>
+        <p class="host-card__micro">Qui anime la soirée avec toi</p>
+      </section>
+      <div id="guestsList" class="host-guests-list">
+        <div class="empty">
+          <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0-3-3.87"/></svg></div>
+          <div class="empty-text">Aucun guest pour l’instant.<br>Fais scanner le QR code !</div>
+        </div>
       </div>
-    </div>
-    <div style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;align-items:center;gap:10px">
-      <div class="section-title" style="align-self:flex-start;width:100%">📤 Inviter des guests</div>
-      <button class="btn btn-primary" onclick="openShare()">
-        🔗 Partager le lien
-      </button>
-      <button class="btn btn-secondary" onclick="switchTab('qr')">
-        📱 QR Code
-      </button>
+      <div id="magicInviteHost" class="magic-invite-host host-card host-card--magic-invite" style="display:none" aria-live="polite"></div>
+      <section class="host-card host-card--guest-share">
+        <div class="host-card__label-row">Inviter</div>
+        <div class="host-guest-share-actions">
+          <button type="button" class="btn btn-primary btn--host-compact" onclick="openShare()">Partager le lien</button>
+          <button type="button" class="btn btn-secondary btn--host-compact" onclick="switchTab('qr')">QR code</button>
+        </div>
+      </section>
     </div>
   </div>
 
   <!-- ═══ PANEL : QR CODE ═══ -->
   <div class="tab-panel" id="panel-qr">
-    <div class="qr-minimal" id="qrWrapper">
-      <canvas id="qrCanvas" width="320" height="320"></canvas>
-      <div class="qr-session-code" id="qrSessionCodeBig" aria-label="Code session"></div>
-      <p class="qr-url-hint" id="qrUrlShort"></p>
-    </div>
-    <span id="qrLinkText" hidden></span>
-    <div class="qr-actions-stack">
-      <button type="button" class="btn btn-primary btn-block" onclick="copyQrLink()">Copier le lien</button>
-      <button type="button" class="btn btn-secondary btn-block end-btn terminate-session-btn" onclick="confirmEndSession()">Terminer la session</button>
+    <div class="host-tab-stack host-tab-stack--qr">
+      <section class="host-card host-card--qr-compact" aria-label="Rejoindre la session">
+        <div class="qr-minimal qr-minimal--compact" id="qrWrapper">
+          <canvas id="qrCanvas" width="320" height="320"></canvas>
+          <div class="qr-code-pill" id="qrSessionCodeBig" aria-label="Code session"></div>
+          <p class="qr-url-hint qr-url-hint--compact" id="qrUrlShort"></p>
+        </div>
+      </section>
+      <span id="qrLinkText" hidden></span>
+      <div class="qr-actions-stack qr-actions-stack--compact">
+        <button type="button" class="btn btn-primary btn--host-compact btn--qr-primary" onclick="copyQrLink()">Copier le lien</button>
+        <button type="button" class="btn btn-ghost-danger btn--host-compact" onclick="confirmEndSession()">Terminer la session</button>
+      </div>
     </div>
   </div>
 
@@ -1324,7 +1350,7 @@
     if (!canvas || !canvas.getContext) return;
     const ctx    = canvas.getContext('2d');
     const DPR    = Math.min(window.devicePixelRatio || 1, 2);
-    const CSS_W  = Math.min(320, Math.max(220, Math.floor((window.innerWidth || 360) - 40)));
+    const CSS_W  = Math.min(228, Math.max(168, Math.floor(Math.min(420, window.innerWidth || 360) * 0.46)));
     canvas.style.width  = CSS_W + 'px';
     canvas.style.height = CSS_W + 'px';
     canvas.width  = CSS_W * DPR;
@@ -1409,6 +1435,7 @@
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.getElementById(`tab-${name}`).classList.add('active');
     document.getElementById(`panel-${name}`).classList.add('active');
+    document.body.dataset.hostTab = name;
     const amBar = document.getElementById('amBar');
     if (amBar && name !== 'playing') amBar.classList.remove('visible');
     if (amBar && name === 'playing' && currentTrack) amBar.classList.add('visible');
@@ -1597,17 +1624,22 @@
 
   function spotifyActivationUiPending(pending) {
     const btn = document.getElementById('amActivateMusicBtn');
+    const liveBtn = document.getElementById('livePanelActivateBtn');
     const bar = document.getElementById('amBar');
-    if (!btn) return;
+    const apply = b => {
+      if (!b) return;
+      if (pending) {
+        b.disabled = true;
+        b.textContent = 'Activation du son...';
+        return;
+      }
+      b.disabled = false;
+      if (_activateSoundAttempt >= 3) b.textContent = 'Réessayer';
+      else b.textContent = 'Activer le son';
+    };
     if (bar) bar.classList.toggle('am-bar--loading', !!pending);
-    if (pending) {
-      btn.disabled = true;
-      btn.textContent = 'Activation du son...';
-      return;
-    }
-    btn.disabled = false;
-    if (_activateSoundAttempt >= 3) btn.textContent = 'Réessayer';
-    else btn.textContent = 'Activer le son';
+    apply(btn);
+    apply(liveBtn);
   }
 
   async function waitForSpotifyDeviceReady(timeoutMs) {
@@ -1877,12 +1909,19 @@
     } else if (sourceHelper && _activeAudioSource === 'spotify') {
       sourceHelper.hidden = false;
       sourceHelper.textContent = 'Lecture via Spotify';
+    } else if (sourceHelper) {
+      sourceHelper.hidden = true;
+      sourceHelper.textContent = '';
     }
-    if (activateBtn) {
-      activateBtn.hidden = !(st === 'needs_device' || st === 'no_spotify');
-      activateBtn.textContent = st === 'no_spotify' ? 'Connecter Spotify' : (_activateSoundAttempt >= 3 ? 'Réessayer' : 'Activer le son');
-      activateBtn.disabled = _activateSoundPending;
-    }
+    const liveActivate = document.getElementById('livePanelActivateBtn');
+    const syncActivate = b => {
+      if (!b) return;
+      b.hidden = !(st === 'needs_device' || st === 'no_spotify');
+      b.textContent = st === 'no_spotify' ? 'Connecter Spotify' : (_activateSoundAttempt >= 3 ? 'Réessayer' : 'Activer le son');
+      b.disabled = _activateSoundPending;
+    };
+    if (activateBtn) syncActivate(activateBtn);
+    syncActivate(liveActivate);
     ['amPrevBtn', 'amPlayBtn', 'amSkipBtn', 'amVolumeBtn'].forEach(id => {
       const btn = document.getElementById(id);
       if (!btn) return;
@@ -1956,7 +1995,7 @@
     }
     const liveSrc = document.getElementById('liveSourceLine');
     if (liveSrc) {
-      if (_activeAudioSource === 'youtube') liveSrc.textContent = 'Lecture via YouTube';
+      if (_activeAudioSource === 'youtube') liveSrc.textContent = 'Lecture directe';
       else if (_activeAudioSource === 'spotify') liveSrc.textContent = 'Lecture via Spotify';
       else liveSrc.textContent = '';
     }
@@ -3153,7 +3192,7 @@
     const b = document.getElementById('badge-guests');
     if (guestCount > 0) { b.textContent = guestCount; b.classList.add('show'); }
     else b.classList.remove('show');
-    document.getElementById('guestCountDisplay').textContent = guestCount ? `(${guestCount})` : '';
+    document.getElementById('guestCountDisplay').textContent = guestCount ? String(guestCount) : '';
     const oldSnap = {};
     queue.forEach(t => {
       oldSnap[t.id] = { v: t.votes | 0, s: t.status || 'pending' };
@@ -3362,9 +3401,8 @@
     wrap.innerHTML =
       '<div class="zpeed-top3">' +
       top
-        .map(([n, s], i) => {
-          const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉';
-          return `<span class="zpeed-top3-pill">${medal} ${zpeedEscapeHtmlHost(n)} · ${s}</span>`;
+        .map(([n, s]) => {
+          return `<span class="zpeed-top3-pill">${zpeedEscapeHtmlHost(n)} · ${s}</span>`;
         })
         .join('') +
       '</div>';
@@ -3409,7 +3447,7 @@
   function renderQueue() {
     const el = document.getElementById('queueList');
     renderSwipeVoteCard();
-    document.getElementById('queueCount').textContent = queue.length ? `(${queue.length})` : '';
+    document.getElementById('queueCount').textContent = queue.length ? String(queue.length) : '';
     if (!queue.length) {
       el.innerHTML = `<div class="empty"><div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div><div class="empty-text">File vide...</div></div>`;
       renderSourcesWidgets();
@@ -3429,21 +3467,26 @@
       const likes = Number(t.likes) || 0;
       const skips = Number(t.skips) || 0;
       const thVotes = roomMeta.voteThreshold != null ? Number(roomMeta.voteThreshold) : NaN;
+      const acceptedish = stKey === 'accepted' || stKey === 'spotify_queued';
       const voteLabel = isPlayingNow
         ? 'En lecture'
-        : Number.isFinite(thVotes)
-          ? `👍 ${likes} / ${thVotes} votes`
-          : `👍 ${likes} votes`;
+        : acceptedish
+          ? 'Validé'
+          : Number.isFinite(thVotes)
+            ? `👍 ${likes} / ${thVotes}`
+            : `👍 ${likes}`;
       const voteLabelClass = isPlayingNow
         ? 'queue-vote-status queue-vote-status--playing'
-        : 'queue-vote-status queue-vote-status--pending';
+        : acceptedish
+          ? 'queue-vote-status queue-vote-status--validated'
+          : 'queue-vote-status queue-vote-status--pending';
       return `
-        <div class="queue-item track-card ${stClass} ${heatTier}" id="qrow-${t.id}" data-track-id="${t.id || ''}">
+        <div class="queue-item track-card queue-item--host-compact ${stClass} ${heatTier}" id="qrow-${t.id}" data-track-id="${t.id || ''}">
           <div class="zpeed-react-layer" aria-hidden="true"></div>
           <span class="zpeed-validated-tag">${VALIDATION_LABEL}</span>
-          <div class="host-q-idx" style="font-family:'Roboto', sans-serif;font-size:1rem;font-weight:700;color:var(--text2);min-width:24px;text-align:center;align-self:flex-start;padding-top:4px">${i+1}</div>
+          <div class="host-q-idx">${i + 1}</div>
           <img class="queue-thumb" src="${t.thumbnail||''}" onerror="this.onerror=null;this.src=THUMB_FALLBACK" alt="">
-          <div class="queue-info" style="flex:1;min-width:0">
+          <div class="queue-info queue-info--host-compact">
             <div class="queue-title">${t.title}</div>
             <div class="queue-meta">${t.channel || ''}</div>
             <div class="queue-proposer">${
@@ -3452,9 +3495,9 @@
                 : `<span>${t.proposedBy === '🎧 Host' ? '🎧 Host' : '🎤 ' + t.proposedBy}</span>`
             }</div>
             <div class="${voteLabelClass}">${voteLabel}</div>
-            ${voters ? `<div class="voter-avatars">${voters}</div>` : ''}
+            ${voters ? `<div class="voter-avatars voter-avatars--host-queue">${voters}</div>` : ''}
           </div>
-          <div class="queue-item--actions">
+          <div class="queue-item--actions queue-item--actions--host-compact">
             <button type="button" class="sugg-related-btn queue-related-btn" onclick="event.stopPropagation();showRelatedTracks(${safeTr})" aria-label="Morceaux liés">Liés</button>
             <button type="button" class="btn btn-small btn-green ui-btn-play" onclick="event.stopPropagation();playTrack('${t.id}')" aria-label="Lecture">▶</button>
           </div>
@@ -3541,15 +3584,18 @@
     const vibe = raw || 'En cours';
     el.textContent = `Ambiance : ${vibe}`;
     if (sub) sub.textContent = 'Basé sur les personnes présentes';
-    const liveV = document.getElementById('sessionVibeHostLive');
-    if (liveV) liveV.textContent = el.textContent;
+    const lv1 = document.getElementById('liveVibeCardLine');
+    const lv2 = document.getElementById('liveVibeCardSub');
+    if (lv1) lv1.textContent = el.textContent;
+    if (lv2) lv2.textContent = sub ? sub.textContent : '';
     renderMagicInviteHost();
   }
 
   function renderMagicInviteHost() {
     const box = document.getElementById('magicInviteHost');
     if (!box) return;
-    const sug = roomMeta && Array.isArray(roomMeta.magicInviteSuggestions) ? roomMeta.magicInviteSuggestions : [];
+    const sugRaw = roomMeta && Array.isArray(roomMeta.magicInviteSuggestions) ? roomMeta.magicInviteSuggestions : [];
+    const sug = sugRaw.slice(0, 3);
     if (!sug.length) {
       box.style.display = 'none';
       box.innerHTML = '';
@@ -3557,7 +3603,7 @@
     }
     box.style.display = 'block';
     box.innerHTML =
-      '<div class="magic-invite-host-title">✨ Suggestions d’invités</div>' +
+      '<div class="magic-invite-host-title">Suggestions d’invités</div>' +
       sug
         .map(s => {
           const name = zpeedEscapeHtmlHost((s && s.name) || 'Guest');
@@ -3657,28 +3703,35 @@
     const likes = Number(track.likes) || 0;
     const skips = Number(track.skips) || 0;
     wrap.innerHTML = `
-      <div class="swipe-vote-title">Swipe</div>
-      <div class="swipe-vote-hint swipe-vote-hint--lr" aria-hidden="true"><span>← Skip</span><span>Like →</span></div>
-      <div class="swipe-vote-card" id="swipeVoteCard" data-track-id="${track.id}">
-        <span class="swipe-vote-badge swipe-vote-badge--like">❤️ LIKE</span>
-        <span class="swipe-vote-badge swipe-vote-badge--skip">❌ SKIP</span>
-        <img class="swipe-vote-cover" src="${track.thumbnail || THUMB_FALLBACK}" alt="${track.title || 'Track'}" onerror="this.onerror=null;this.src=THUMB_FALLBACK">
+      <div class="swipe-vote-hint swipe-vote-hint--lr swipe-vote-hint--host" aria-hidden="true"><span>← Skip</span><span>Like →</span></div>
+      <div class="swipe-vote-card swipe-vote-card--host-xl" id="swipeVoteCard" data-track-id="${track.id}">
+        <span class="swipe-vote-badge swipe-vote-badge--like">LIKE</span>
+        <span class="swipe-vote-badge swipe-vote-badge--skip">SKIP</span>
+        <img class="swipe-vote-cover swipe-vote-cover--host-xl" src="${track.thumbnail || THUMB_FALLBACK}" alt="${track.title || 'Track'}" onerror="this.onerror=null;this.src=THUMB_FALLBACK">
         <div class="swipe-vote-track">${track.title || 'Track'}</div>
         <div class="swipe-vote-artist">${track.channel || 'SONDER'}</div>
         <div class="swipe-vote-counts">👍 ${likes}${skips ? ` · ${skips} skip` : ''}</div>
-        <div class="swipe-vote-actions">
-          <button type="button" class="swipe-vote-btn swipe-vote-btn--skip" onclick="submitSwipeVote('${track.id}','skip')">❌</button>
-          <button type="button" class="swipe-vote-btn swipe-vote-btn--like" onclick="submitSwipeVote('${track.id}','like')">❤️</button>
+        <div class="swipe-vote-actions swipe-vote-actions--host-labeled">
+          <button type="button" class="swipe-vote-btn swipe-vote-btn--skip swipe-vote-btn--wide" onclick="submitSwipeVote('${track.id}','skip')"><span class="swipe-vote-btn__emoji" aria-hidden="true">❌</span><span class="swipe-vote-btn__txt">Skip</span></button>
+          <button type="button" class="swipe-vote-btn swipe-vote-btn--like swipe-vote-btn--wide" onclick="submitSwipeVote('${track.id}','like')"><span class="swipe-vote-btn__emoji" aria-hidden="true">❤️</span><span class="swipe-vote-btn__txt">Like</span></button>
         </div>
       </div>
     `;
     bindSwipeVoteCard();
   }
 
+  function hostGuestSocialLabel(name) {
+    const lines = ['Apporte de l’énergie', 'Découvre de bons sons', 'Présent dans la vibe'];
+    let h = 0;
+    const s = String(name || '');
+    for (let i = 0; i < s.length; i++) h = s.charCodeAt(i) + ((h << 5) - h);
+    return lines[Math.abs(h) % lines.length];
+  }
+
   function renderGuests() {
     const el = document.getElementById('guestsList');
     if (!guests.length) {
-      el.innerHTML = `<div class="empty"><div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0-3-3.87"/></svg></div><div class="empty-text">Aucun guest pour l'instant.<br>Fais scanner le QR code !</div></div>`;
+      el.innerHTML = `<div class="empty"><div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0-3-3.87"/></svg></div><div class="empty-text">Aucun guest pour l’instant.<br>Fais scanner le QR code !</div></div>`;
       renderSourcesWidgets();
       return;
     }
@@ -3686,18 +3739,21 @@
       .map(g => {
         const uid = g.userId ? String(g.userId) : '';
         const uidAttr = uid ? ` data-profile-user="${encodeURIComponent(uid)}"` : '';
-        const itemCls = uid ? 'guest-item guest-item--profile' : 'guest-item';
+        const itemCls = uid ? 'guest-item guest-item--profile guest-card' : 'guest-item guest-card';
+        const role = g.role != null && String(g.role).trim() !== '' ? String(g.role).trim() : 'Guest';
+        const vibeLine = hostGuestSocialLabel(g.name);
         return `
       <div class="${itemCls}"${uidAttr}>
-        <div class="guest-avatar">
+        <div class="guest-avatar guest-card__av">
           <img src="${avatarUrl(g.name, 80)}" alt="${g.name}"
                onerror="this.onerror=null;this.style.display='none';this.parentElement.textContent='${g.name.charAt(0).toUpperCase()}';this.parentElement.style.background='${stringToColor(g.name)}'">
         </div>
-        <div style="flex:1">
-          <div style="font-weight:600">${g.name}</div>
-          <div style="font-size:0.75rem;color:var(--text2)">Guest</div>
+        <div class="guest-card__body">
+          <div class="guest-card__name">${g.name}</div>
+          <div class="guest-card__role">${role}</div>
+          <div class="guest-card__vibe">${vibeLine}</div>
         </div>
-        <span class="badge active" style="font-size:0.65rem"><span class="dot pulse"></span> Live</span>
+        <span class="guest-card__live"><span class="dot pulse"></span> Live</span>
       </div>`;
       })
       .join('');
