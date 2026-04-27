@@ -6,6 +6,7 @@
   <title>ZPEED — Host Dashboard</title>
   <link rel="stylesheet" href="style.css">
   <script src="/socket.io/socket.io.js"></script>
+  <script src="demoSafeCopy.js"></script>
   <script src="https://www.youtube.com/iframe_api"></script>
   <script src="https://sdk.scdn.co/spotify-player.js"></script>
   <style>
@@ -1086,7 +1087,7 @@
   <!-- ═══ APPLE MUSIC PLAYER BAR ═══ -->
   <div class="am-bar" id="amBar">
     <div class="am-playback-hint" id="amPlaybackHint" hidden></div>
-    <button type="button" class="am-activate-btn" id="amActivateMusicBtn" onclick="activateSound()" hidden>Lancer la musique</button>
+    <button type="button" class="am-activate-btn" id="amActivateMusicBtn" onclick="activateSound()" hidden title="Ouvre Spotify une fois si nécessaire.">Activer le son</button>
     <div class="am-bar-row">
       <div class="am-transport">
         <button type="button" class="am-btn" id="amPrevBtn" onclick="carouselPrev()" aria-label="Titre précédent">
@@ -1600,7 +1601,7 @@
     }
     btn.disabled = false;
     if (_activateSoundAttempt >= 3) btn.textContent = 'Réessayer';
-    else btn.textContent = 'Lancer la musique';
+    else btn.textContent = 'Activer le son';
   }
 
   async function waitForSpotifyDeviceReady(timeoutMs) {
@@ -1854,7 +1855,7 @@
     }
     if (activateBtn) {
       activateBtn.hidden = !(st === 'needs_device' || st === 'no_spotify');
-      activateBtn.textContent = st === 'no_spotify' ? 'Connecter Spotify' : (_activateSoundAttempt >= 3 ? 'Réessayer' : 'Lancer la musique');
+      activateBtn.textContent = st === 'no_spotify' ? 'Connecter Spotify' : (_activateSoundAttempt >= 3 ? 'Réessayer' : 'Activer le son');
       activateBtn.disabled = _activateSoundPending;
     }
     ['amPrevBtn', 'amPlayBtn', 'amSkipBtn', 'amVolumeBtn'].forEach(id => {
@@ -1905,7 +1906,8 @@
         };
       } else if (st === 'no_spotify') {
         hint.hidden = false;
-        hint.textContent = 'Connecte Spotify puis appuie sur "Lancer la musique".';
+        hint.textContent =
+          'Connecte Spotify puis appuie sur « Activer le son ». Ouvre Spotify une fois si nécessaire.';
       } else if (st === 'rate_limited') {
         hint.hidden = false;
         hint.textContent = 'Spotify limite les requêtes. Réessaie dans quelques minutes.';
@@ -3018,7 +3020,13 @@
     }
   });
 
-  socket.on('notification', ({ message }) => showToast(message));
+  socket.on('notification', ({ message }) => {
+    const t =
+      typeof sanitizeNotificationMessage === 'function'
+        ? sanitizeNotificationMessage(message)
+        : String(message || '');
+    if (t) showToast(t);
+  });
 
   // 🎤 AI DJ — commentaire dans le ticker + notif
   socket.on('ai:dj_comment', ({ comment, track }) => {

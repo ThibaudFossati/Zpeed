@@ -2043,9 +2043,15 @@ io.on('connection', (socket) => {
 
   socket.on('track:swipe', async ({ code, trackId, direction, guestId, guestName, userName, hostId, userId }) => {
     const s = sessions[code];
-    if (!s) return;
+    if (!s) {
+      socket.emit('notification', { message: 'Actualise ou réessaie' });
+      return;
+    }
     const track = s.queue.find(t => t.id === trackId);
-    if (!track) return;
+    if (!track) {
+      socket.emit('notification', { message: 'Actualise ou réessaie' });
+      return;
+    }
     const voterKey =
       guestId ||
       (hostId && s.hostId === hostId ? `host:${s.hostId}` : null) ||

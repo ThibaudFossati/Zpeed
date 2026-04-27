@@ -6,6 +6,7 @@
   <title>ZPEED — Guest</title>
   <link rel="stylesheet" href="style.css">
   <script src="/socket.io/socket.io.js"></script>
+  <script src="demoSafeCopy.js"></script>
   <script src="bg.js"></script>
   <script src="notif.js"></script>
   <style>
@@ -1099,7 +1100,13 @@
     if (reactorName !== guestName) showVotedToast(reactorName, emoji);
   });
 
-  socket.on('notification', ({ message }) => showToast(message));
+  socket.on('notification', ({ message }) => {
+    const t =
+      typeof sanitizeNotificationMessage === 'function'
+        ? sanitizeNotificationMessage(message)
+        : String(message || '');
+    if (t) showToast(t);
+  });
 
   // 🎤 AI DJ — commentaire quand un titre démarre
   socket.on('ai:dj_comment', ({ comment, track }) => {
