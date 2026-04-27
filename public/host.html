@@ -1494,6 +1494,7 @@
   }
 
   function hostAmBarTransportLocked() {
+    if (_activeAudioSource === 'youtube') return false;
     if (window._spotifyMockMode) return true;
     if (window._spotifyRateLimited) return true;
     if (!hostSpotifyChipIsLinked()) return false;
@@ -1504,6 +1505,57 @@
 
   let _activateSoundPending = false;
   let _activateSoundAttempt = 0;
+  let _activeAudioSource = null;
+  let _audioPlaybackStartedAt = 0;
+  const _youtubeResolveCache = new Map();
+
+  function setActiveAudioSource(source) {
+    _activeAudioSource = source || null;
+    _audioPlaybackStartedAt = Date.now();
+    refreshSpotifyHostUi();
+  }
+
+  function getPreferredPlayableTrack() {
+    if (currentTrack) return currentTrack;
+    if (queue.length) return queue[0];
+    return null;
+  }
+
+  async function resolveYoutubeForTrack(track) {
+    if (!track) return null;
+    const directId = track.youtubeId || track.videoId || null;
+    if (directId) {
+      return {
+        youtubeId: directId,
+        youtubeUrl: track.youtubeUrl || `https://www.youtube.com/watch?v=${directId}`
+      };
+    }
+    if (typeof track.youtubeUrl === 'string' && /v=([A-Za-z0-9_-]{6,})/.test(track.youtubeUrl)) {
+      const id = track.youtubeUrl.match(/v=([A-Za-z0-9_-]{6,})/)?.[1] || null;
+      if (id) return { youtubeId: id, youtubeUrl: track.youtubeUrl };
+    }
+    const q = `${track.title || ''} ${track.channel || track.artist || ''}`.replace(/\s+/g, ' ').trim();
+    if (!q) return null;
+    const key = q.toLowerCase();
+    const now = Date.now();
+    const cached = _youtubeResolveCache.get(key);
+    if (cached && cached.expiresAt > now) return cached.match;
+    const res = await fetch(`/api/youtube/resolve?q=${encodeURIComponent(q)}`, { credentials: 'same-origin' }).catch(() => null);
+    if (!res) return null;
+    const payload = await res.json().catch(() => ({}));
+    if (!payload?.ok || !payload.match?.youtubeId) return null;
+    const match = payload.match;
+    _youtubeResolveCache.set(key, { match, expiresAt: now + 30000 });
+    return match;
+  }
+
+  async function stopSpotifyPlayback() {
+    try {
+      if (window._spotifyPlayer && typeof window._spotifyPlayer.pause === 'function') {
+        await window._spotifyPlayer.pause();
+      }
+    } catch (_) {}
+  }
 
   function spotifyActivationUiPending(pending) {
     const btn = document.getElementById('amActivateMusicBtn');
@@ -1620,6 +1672,65 @@
     return state;
   }
 
+  async function waitForSpotifyPlaybackConfirmation(timeoutMs = 2000) {
+    const startedAt = Date.now();
+    while ((Date.now() - startedAt) < timeoutMs) {
+      const state = await fetchCurrentSpotifyPlaybackState();
+      if (state && (state.isPlaying || state.track?.uri)) return true;
+      await new Promise(resolve => setTimeout(resolve, 250));
+    }
+    return false;
+  }
+
+  async function trySpotifyActivation(track) {
+    if (!window._spotifyToken || !hostSecret) return false;
+    stopVideo();
+    if (!hostSpotifyPlaybackDeviceReady()) {
+      await initSpotifySDK();
+      await waitForSpotifyDeviceReady(1200);
+    }
+    const spotifyUri =
+      track?.spotifyUri ||
+      (track?.spotifyId ? `spotify:track:${track.spotifyId}` : null) ||
+      (currentTrack?.spotifyUri || (currentTrack?.spotifyId ? `spotify:track:${currentTrack.spotifyId}` : null));
+    const payload = {
+      code,
+      secret: hostSecret,
+      deviceId: window._spotifyDeviceId,
+      trackUri: spotifyUri || null
+    };
+    const res = await fetch('/api/spotify/activate-sound', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify(payload)
+    }).catch(() => null);
+    if (!res) return false;
+    const data = await res.json().catch(() => ({}));
+    if (!(res.ok && data.ok)) {
+      if (data?.rateLimited || data?.reason === 'rate_limited') {
+        markSpotifyUnavailable('Synchronisation Spotify temporairement ralentie');
+      }
+      return false;
+    }
+    if (data.playback) applySpotifyPlaybackStateToUi(data.playback);
+    const confirmed = await waitForSpotifyPlaybackConfirmation(2000);
+    if (!confirmed) return false;
+    setActiveAudioSource('spotify');
+    return true;
+  }
+
+  async function tryYouTubeFallback(track) {
+    const picked = track || getPreferredPlayableTrack();
+    if (!picked) return false;
+    const ytMatch = await resolveYoutubeForTrack(picked);
+    if (!ytMatch?.youtubeId) return false;
+    currentTrack = { ...picked, videoId: ytMatch.youtubeId, youtubeId: ytMatch.youtubeId, youtubeUrl: ytMatch.youtubeUrl || null, source: 'youtube' };
+    playVideo(ytMatch.youtubeId);
+    setActiveAudioSource('youtube');
+    return true;
+  }
+
   let playerStatePollInterval = null;
   function startPlayerStatePolling() {
     if (playerStatePollInterval || window._spotifyMockMode) return;
@@ -1647,88 +1758,35 @@
     if (_activateSoundPending) return;
     _activateSoundPending = true;
     const st = getHostPlaybackUiState();
-    if (st === 'mock') {
-      showToast('Mode démo : recherche et file actives, son via Spotify requis');
-      _activateSoundPending = false;
-      return;
-    }
-    if (st === 'no_spotify') {
-      connectPlatform('spotify');
-      _activateSoundPending = false;
-      return;
-    }
+    const pickedTrack = getPreferredPlayableTrack();
     _activateSoundAttempt = 0;
     spotifyActivationUiPending(true);
     try {
-      if (!window._spotifyToken) {
-        showToast('Connecte Spotify pour activer le son.');
+      if (!pickedTrack) {
+        showToast('Ajoute un titre pour lancer la musique');
         return;
       }
-      if (!hostSpotifyPlaybackDeviceReady()) {
-        await initSpotifySDK();
-        const ok = await waitForSpotifyDeviceReady(2600);
-        if (!ok) {
-          // continue with retries against activation endpoint
+      if (st === 'no_spotify') {
+        const ytOk = await tryYouTubeFallback(pickedTrack);
+        if (ytOk) {
+          showToast('Lecture directe activée');
+          return;
         }
+        connectPlatform('spotify');
+        showToast('Ajoute un titre pour lancer la musique');
+        return;
       }
-      let fallbackTrack = currentTrack?.spotifyUri || null;
-      if (!fallbackTrack && currentTrack?.spotifyId) fallbackTrack = `spotify:track:${currentTrack.spotifyId}`;
-      if (!fallbackTrack) {
-        const queuedSpotify = queue.find(t => t.spotifyUri || t.spotifyId);
-        if (queuedSpotify) fallbackTrack = queuedSpotify.spotifyUri || `spotify:track:${queuedSpotify.spotifyId}`;
+      const spotifyOk = await trySpotifyActivation(pickedTrack);
+      if (spotifyOk) {
+        showToast('SONDER contrôle la musique');
+        return;
       }
-      const hasTrackToPlay = !!fallbackTrack;
-      const payload = {
-        code,
-        secret: hostSecret,
-        deviceId: window._spotifyDeviceId,
-        trackUri: fallbackTrack
-      };
-      for (let i = 0; i < 3; i++) {
-        _activateSoundAttempt = i + 1;
-        const stateHelper = document.getElementById('amStateHelper');
-        if (stateHelper) stateHelper.textContent = 'Recherche du lecteur...';
-        const res = await fetch('/api/spotify/activate-sound', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify(payload)
-        }).catch(() => null);
-        if (!res) {
-          if (i < 2) {
-            await new Promise(resolve => setTimeout(resolve, 3000));
-            continue;
-          }
-          showToast('Ouvre Spotify une fois, puis reviens ici.');
-          return;
-        }
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data.ok) {
-          _activateSoundAttempt = 0;
-          if (data.playback) applySpotifyPlaybackStateToUi(data.playback);
-          await syncSpotifyPlaybackUi();
-          if (hasTrackToPlay) showToast('SONDER contrôle la musique');
-          else showToast('Ajoute un titre pour lancer la musique');
-          return;
-        }
-        if (data?.rateLimited || data?.reason === 'rate_limited') {
-          markSpotifyUnavailable('Spotify limite les requêtes. Réessaie dans quelques minutes.');
-          showToast('Spotify limite les requêtes. Réessaie dans quelques minutes.');
-          _activateSoundAttempt = 3;
-          return;
-        }
-        if (data?.demoMode) {
-          markSpotifyUnavailable('Mode démo : recherche et file actives, son via Spotify requis');
-          showToast('Mode démo : recherche et file actives, son via Spotify requis');
-          _activateSoundAttempt = 3;
-          return;
-        }
-        if (i < 2) {
-          await new Promise(resolve => setTimeout(resolve, 3000));
-          continue;
-        }
-        showToast('Ouvre Spotify une fois, puis reviens ici.');
+      const ytOk = await tryYouTubeFallback(pickedTrack);
+      if (ytOk) {
+        showToast('Lecture directe activée');
+        return;
       }
+      showToast('Ajoute un titre pour lancer la musique');
     } finally {
       spotifyActivationUiPending(false);
       refreshSpotifyHostUi();
@@ -1745,6 +1803,20 @@
     const deviceBtn = document.getElementById('amDeviceBtn');
     const isSimple = st !== 'ready';
     if (amBar) amBar.classList.toggle('am-bar--simple', isSimple);
+    const sourceBadge = document.getElementById('amDeviceStatus');
+    const sourceHelper = document.getElementById('amStateHelper');
+    if (sourceBadge) {
+      if (_activeAudioSource === 'youtube') sourceBadge.textContent = '▶ Lecture directe';
+      else if (_activeAudioSource === 'spotify') sourceBadge.textContent = '● Spotify';
+      else sourceBadge.textContent = '● SONDER';
+    }
+    if (sourceHelper && _activeAudioSource === 'youtube') {
+      sourceHelper.hidden = false;
+      sourceHelper.textContent = 'Lecture directe dans l’app';
+    } else if (sourceHelper && _activeAudioSource === 'spotify') {
+      sourceHelper.hidden = false;
+      sourceHelper.textContent = 'Lecture via Spotify';
+    }
     if (activateBtn) {
       activateBtn.hidden = !(st === 'needs_device' || st === 'no_spotify');
       activateBtn.textContent = st === 'no_spotify' ? 'Connecter Spotify' : (_activateSoundAttempt >= 3 ? 'Réessayer' : 'Activer le son');
@@ -1763,7 +1835,7 @@
       deviceBtn.disabled = !!deviceLocked;
       deviceBtn.setAttribute('aria-disabled', deviceLocked ? 'true' : 'false');
     }
-    if (hint) {
+    if (hint && !_activeAudioSource) {
       hint.onclick = null;
       hint.onkeydown = null;
       hint.classList.remove('am-playback-hint--tap');
@@ -1816,6 +1888,9 @@
         hint.hidden = true;
         hint.textContent = '';
       }
+    } else if (hint && _activeAudioSource) {
+      hint.hidden = true;
+      hint.textContent = '';
     }
     if (locked) {
       stopProgressSim();
@@ -2065,6 +2140,10 @@
   let _suggestIndex = -1;
   let _suggestData  = [];
   let _liveSearchSeq = 0;
+  const _searchCache = new Map();
+  const _SEARCH_CACHE_TTL_MS = 30000;
+  const _SEARCH_DEBOUNCE_MS = 450;
+  let _spotifySearchBlockedUntil = 0;
 
   function escapeHtml(s) {
     return String(s)
@@ -2115,7 +2194,7 @@
       hideSuggestions();
       return;
     }
-    _suggestTimer = setTimeout(() => executeLiveSearch(q, { fromButton: false }), 250);
+    _suggestTimer = setTimeout(() => executeLiveSearch(q, { fromButton: false }), _SEARCH_DEBOUNCE_MS);
   }
 
   function onSearchKeydown(e) {
@@ -2268,20 +2347,33 @@
       (Array.isArray(t.artists) ? t.artists.map(a => a.name).filter(Boolean).join(', ') : '') ||
       '';
     if (!title && !channel && !id) return null;
-    return { ...t, id: id || `row_${title.slice(0, 24)}_${channel.slice(0, 16)}`, title, channel };
+    const source = t.source || (t.spotifyUri || t.spotifyId || t.platform === 'spotify' ? 'spotify' : 'youtube');
+    return { ...t, id: id || `row_${title.slice(0, 24)}_${channel.slice(0, 16)}`, title, channel, source };
   }
 
   async function fetchLiveSearchResults(q) {
+    const cacheKey = q.toLowerCase();
+    const now = Date.now();
+    const cached = _searchCache.get(cacheKey);
+    if (cached && cached.expiresAt > now) {
+      return cached.value;
+    }
+
+    const spotifyFetch =
+      _spotifySearchBlockedUntil > now
+        ? Promise.resolve([])
+        : fetch(`/api/spotify/search?q=${encodeURIComponent(q)}&code=${encodeURIComponent(code)}`)
+            .then(async r => {
+              const body = await r.json().catch(() => ({}));
+              console.log('[HOST_SEARCH] fetch status', { spotifyHttp: r.status, ok: r.ok });
+              if (!r.ok) return { __error: true, status: r.status, body };
+              return body;
+            })
+            .catch(() => ({ __error: true, status: 0, body: { message: 'Spotify unreachable' } }));
+
     const [ytRes, spRes] = await Promise.allSettled([
       fetch(`/api/search?q=${encodeURIComponent(q)}`).then(r => r.json()).catch(() => []),
-      fetch(`/api/spotify/search?q=${encodeURIComponent(q)}&code=${encodeURIComponent(code)}`)
-        .then(async r => {
-          const body = await r.json().catch(() => ({}));
-          console.log('[HOST_SEARCH] fetch status', { spotifyHttp: r.status, ok: r.ok });
-          if (!r.ok) return { __error: true, status: r.status, body };
-          return body;
-        })
-        .catch(() => ({ __error: true, status: 0, body: { message: 'Spotify unreachable' } }))
+      spotifyFetch
     ]);
 
     const ytRaw = ytRes.status === 'fulfilled' ? ytRes.value : [];
@@ -2293,6 +2385,13 @@
     let errorMsg = null;
     if (spValue && spValue.__error) {
       errorMsg = formatSpotifySearchErrorForUi(spValue.body, spValue.status);
+      if (spValue.status === 429) {
+        const retryAfter =
+          Number(spValue.body?.details?.retryAfterSeconds) ||
+          Number(spValue.body?.details?.retryAfter) ||
+          30;
+        _spotifySearchBlockedUntil = Date.now() + Math.max(1, retryAfter) * 1000;
+      }
     }
     const spRaw = spValue && spValue.__error ? [] : spValue;
     const spTracks = normalizeSpotifySearchBody(spRaw)
@@ -2306,7 +2405,9 @@
     });
     const tracks = [...spTracks, ...ytTracks].slice(0, 15);
     console.log('[HOST_SEARCH] normalized count', tracks.length);
-    return { tracks, errorMsg };
+    const value = { tracks, errorMsg };
+    _searchCache.set(cacheKey, { value, expiresAt: now + _SEARCH_CACHE_TTL_MS });
+    return value;
   }
 
   async function executeLiveSearch(q, { fromButton }) {
@@ -2423,7 +2524,8 @@
 
   function hostAddTrack(track) {
     const hostName = localStorage.getItem('zpeed_hostName') || 'Host';
-    socket.emit('track:propose', { code, track, guestName: hostName, userName: hostName, hostId });
+    const normalizedTrack = normalizeLiveTrack(track);
+    socket.emit('track:propose', { code, track: normalizedTrack || track, guestName: hostName, userName: hostName, hostId });
     showToast(`✅ "${track.title}" ajouté`);
     _liveSearchSeq++;
     hideSuggestions();
@@ -2504,8 +2606,10 @@
   };
 
   function playVideo(videoId) {
+    stopSpotifyPlayback();
     document.getElementById('yt-player').style.display = 'block';
     document.getElementById('spotify-player-status').style.display = 'none';
+    setActiveAudioSource('youtube');
 
     if (!ytReady) { window._pendingVideoId = videoId; return; }
 
@@ -2529,6 +2633,7 @@
   function stopVideo() {
     document.getElementById('yt-player').style.display = 'none';
     if (ytPlayer && typeof ytPlayer.stopVideo === 'function') ytPlayer.stopVideo();
+    if (_activeAudioSource === 'youtube') setActiveAudioSource(null);
   }
 
   // ─────────────────────────────────────────────
@@ -2681,6 +2786,7 @@
       showToast('Session Spotify expirée ou accès refusé — reconnecte-toi.');
       return;
     }
+    setActiveAudioSource('spotify');
     setTimeout(() => { syncSpotifyPlaybackUi().catch(() => {}); }, 350);
   }
 
@@ -2825,17 +2931,25 @@
     else b.classList.remove('show');
   });
 
-  socket.on('track:playing', ({ track, fromServer }) => {
+  socket.on('track:playing', async ({ track, fromServer }) => {
     currentTrack = track;
     renderNowPlaying();
     updateMiniPlayer();
     obsSetPlaying(track);
-    if (track?.videoId) {
+    if (track?.videoId || track?.youtubeId) {
       switchTab('playing');
-      playVideo(track.videoId);
-    } else if (track?.spotifyUri) {
+      const youtubeId = track.videoId || track.youtubeId;
+      playVideo(youtubeId);
+    } else if (track?.spotifyUri || track?.spotifyId) {
       switchTab('playing');
-      if (!fromServer) playSpotifyTrack(track.spotifyUri);
+      const spotifyUri = track.spotifyUri || (track.spotifyId ? `spotify:track:${track.spotifyId}` : null);
+      if (!fromServer && spotifyUri) {
+        const spotifyOk = await trySpotifyActivation(track);
+        if (!spotifyOk) {
+          const ytOk = await tryYouTubeFallback(track);
+          if (ytOk) showToast('Lecture directe activée');
+        }
+      }
     } else if (track?.preview) {
       previewTrack(track.preview);
     } else {
@@ -3368,6 +3482,15 @@
 
   // ── Play / Pause toggle ─────────────────────────
   async function togglePlayPause() {
+    if (_activeAudioSource === 'youtube' && ytPlayer && typeof ytPlayer.getPlayerState === 'function') {
+      const s = ytPlayer.getPlayerState();
+      if (s === YT.PlayerState.PLAYING && typeof ytPlayer.pauseVideo === 'function') {
+        ytPlayer.pauseVideo();
+      } else if (typeof ytPlayer.playVideo === 'function') {
+        ytPlayer.playVideo();
+      }
+      return;
+    }
     if (hostAmBarTransportLocked()) {
       const st = getHostPlaybackUiState();
       if (currentTrack?.spotifyUri) {
@@ -3378,7 +3501,7 @@
       }
       return;
     }
-    if (currentTrack?.spotifyUri) {
+    if (currentTrack?.spotifyUri || _activeAudioSource === 'spotify') {
       if (!window._spotifyPlayer || !window._spotifyToken) {
         openAmDeviceHelp('setup');
         return;

@@ -762,6 +762,30 @@ app.post('/api/spotify/activate-sound', async (req, res) => {
   }
 });
 
+app.get('/api/player-state', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const { code, secret } = req.query;
+  const roomKey = resolveSessionKey(code);
+  const s = sessions[roomKey];
+  if (!s || !secret || s.hostSecret !== secret || !s.hostSpotify?.tokens?.access_token) {
+    return res.json({ ok: true, source: 'cache', state: null });
+  }
+  const ensure = await ensureSpotifyAccessToken(s, process.env, { roomKey, stage: 'player_state.ensure_token' });
+  if (!ensure.ok) {
+    const gateway = getPlayerGateway(roomKey);
+    return res.json({
+      ok: true,
+      source: 'cache',
+      state: gateway.data
+        ? { ...gateway.data, rateLimited: gateway.isRateLimited, retryAfterSeconds: gateway.retryAfterSeconds || 0 }
+        : null
+    });
+  }
+  if (ensure.refreshed) saveSessions();
+  const result = await fetchSpotifyPlayerState(s.hostSpotify.tokens.access_token, roomKey);
+  return res.json({ ok: true, source: result.source, state: result.state || null });
+});
+
 app.get('/api/spotify/playlists', async (req, res) => {
   const { code } = req.query;
   const roomKey = resolveSessionKey(code);
@@ -985,6 +1009,144 @@ loadSessions();
 
 // speakerSessions : speakerName → sessionCode
 const speakerSessions = {};
+const spotifyPlayerGateway = new Map();
+const youtubeResolveCache = new Map();
+
+function getPlayerGateway(roomKey) {
+  if (!spotifyPlayerGateway.has(roomKey)) {
+    spotifyPlayerGateway.set(roomKey, {
+      data: null,
+      lastFetchAt: 0,
+      nextAllowedAt: 0,
+      isRateLimited: false,
+      retryAfterSeconds: 0,
+      error: null
+    });
+  }
+  return spotifyPlayerGateway.get(roomKey);
+}
+
+function normalizeSpotifyPlayerState(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const track = raw.item && typeof raw.item === 'object'
+    ? {
+        id: raw.item.id || null,
+        name: raw.item.name || null,
+        artist: Array.isArray(raw.item.artists) ? raw.item.artists.map(a => a.name).filter(Boolean).join(', ') : null,
+        album: raw.item.album?.name || null,
+        image: raw.item.album?.images?.[0]?.url || null,
+        durationMs: Number.isFinite(raw.item.duration_ms) ? raw.item.duration_ms : null,
+        uri: raw.item.uri || null
+      }
+    : null;
+  return {
+    isPlaying: !!raw.is_playing,
+    progressMs: Number.isFinite(raw.progress_ms) ? raw.progress_ms : 0,
+    track,
+    device: raw.device
+      ? {
+          id: raw.device.id || null,
+          name: raw.device.name || null,
+          type: raw.device.type || null,
+          volumePercent: Number.isFinite(raw.device.volume_percent) ? raw.device.volume_percent : null,
+          isActive: !!raw.device.is_active
+        }
+      : null,
+    fetchedAt: Date.now(),
+    rateLimited: false
+  };
+}
+
+async function fetchSpotifyPlayerState(accessToken, roomKey) {
+  const gateway = getPlayerGateway(roomKey);
+  const now = Date.now();
+  const MIN_FETCH_INTERVAL_MS = 5000;
+  const MAX_RETRY_AFTER_SECONDS = 120;
+
+  if (gateway.isRateLimited && now < gateway.nextAllowedAt) {
+    const remainingRetryAfter = Math.max(1, Math.ceil((gateway.nextAllowedAt - now) / 1000));
+    return {
+      source: 'cache',
+      state: gateway.data
+        ? { ...gateway.data, rateLimited: true, retryAfterSeconds: remainingRetryAfter }
+        : null
+    };
+  }
+  if (gateway.data && (now - gateway.lastFetchAt) < MIN_FETCH_INTERVAL_MS) {
+    return { source: 'cache', state: gateway.data };
+  }
+
+  try {
+    const r = await axios.get('https://api.spotify.com/v1/me/player', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      validateStatus: () => true
+    });
+
+    if (r.status === 429) {
+      const parsedRetryAfter = Number(r.headers?.['retry-after']);
+      const retryAfterSeconds = Math.min(
+        MAX_RETRY_AFTER_SECONDS,
+        Math.max(1, Number.isFinite(parsedRetryAfter) ? parsedRetryAfter : 5)
+      );
+      gateway.isRateLimited = true;
+      gateway.retryAfterSeconds = retryAfterSeconds;
+      gateway.nextAllowedAt = now + retryAfterSeconds * 1000;
+      gateway.lastFetchAt = now;
+      gateway.error = 'rate_limited';
+      return {
+        source: 'cache',
+        state: gateway.data
+          ? { ...gateway.data, rateLimited: true, retryAfterSeconds }
+          : {
+              isPlaying: false,
+              progressMs: 0,
+              track: null,
+              device: null,
+              fetchedAt: now,
+              rateLimited: true,
+              retryAfterSeconds
+            }
+      };
+    }
+
+    if (r.status === 204) {
+      const normalized = {
+        isPlaying: false,
+        progressMs: 0,
+        track: null,
+        device: null,
+        fetchedAt: now,
+        rateLimited: false
+      };
+      gateway.data = normalized;
+      gateway.lastFetchAt = now;
+      gateway.nextAllowedAt = now + MIN_FETCH_INTERVAL_MS;
+      gateway.isRateLimited = false;
+      gateway.retryAfterSeconds = 0;
+      gateway.error = null;
+      return { source: 'spotify', state: normalized };
+    }
+
+    if (r.status !== 200) {
+      gateway.lastFetchAt = now;
+      gateway.error = 'spotify_unavailable';
+      return { source: 'cache', state: gateway.data };
+    }
+
+    const normalized = normalizeSpotifyPlayerState(r.data);
+    gateway.data = normalized;
+    gateway.lastFetchAt = now;
+    gateway.nextAllowedAt = now + MIN_FETCH_INTERVAL_MS;
+    gateway.isRateLimited = false;
+    gateway.retryAfterSeconds = 0;
+    gateway.error = null;
+    return { source: 'spotify', state: normalized };
+  } catch (e) {
+    gateway.lastFetchAt = now;
+    gateway.error = 'spotify_network_error';
+    return { source: 'cache', state: gateway.data };
+  }
+}
 
 // ─────────────────────────────────────────────
 // REST ROUTES
@@ -1183,6 +1345,35 @@ app.get('/api/search', async (req, res) => {
   } catch (err) {
     console.error('YouTube search error:', err.message);
     res.json([]);
+  }
+});
+
+app.get('/api/youtube/resolve', async (req, res) => {
+  const q = String(req.query.q || '').trim();
+  if (!q) return res.status(400).json({ ok: false, error: 'missing_query' });
+
+  const now = Date.now();
+  const cacheKey = q.toLowerCase();
+  const cacheHit = youtubeResolveCache.get(cacheKey);
+  if (cacheHit && cacheHit.expiresAt > now) {
+    return res.json({ ok: true, source: 'cache', match: cacheHit.match });
+  }
+
+  try {
+    const results = await YouTube.search(q, { limit: 1, type: 'video' });
+    const first = Array.isArray(results) && results[0] ? results[0] : null;
+    if (!first) return res.json({ ok: true, source: 'youtube', match: null });
+    const match = {
+      youtubeId: first.id,
+      youtubeUrl: `https://www.youtube.com/watch?v=${first.id}`,
+      title: first.title || null,
+      channel: first.channel?.name || null,
+      thumbnail: first.thumbnail?.url || `https://img.youtube.com/vi/${first.id}/mqdefault.jpg`
+    };
+    youtubeResolveCache.set(cacheKey, { match, expiresAt: now + 30 * 1000 });
+    return res.json({ ok: true, source: 'youtube', match });
+  } catch (err) {
+    return res.json({ ok: false, source: 'youtube', match: null });
   }
 });
 
