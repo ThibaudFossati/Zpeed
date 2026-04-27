@@ -2390,7 +2390,7 @@
     if (!window._spotifyToken || window._spotifyMockMode || window._spotifyRateLimited) return;
     console.log('[spotify] Web Playback SDK ready callback');
     const player = new Spotify.Player({
-      name: 'ZPEED 🎵',
+      name: 'SONDER — instories',
       getOAuthToken: cb => cb(window._spotifyToken),
       volume: window._spotifyVolume
     });
