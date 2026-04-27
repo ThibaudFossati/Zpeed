@@ -1696,6 +1696,50 @@ body.zpeed-idle #queueList .queue-item.zpeed-nudge-target {
   letter-spacing: 0.02em;
   margin-bottom: 6px;
 }
+
+.coach-pour-toi {
+  margin: 10px 0 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(167, 139, 250, 0.22);
+  background: linear-gradient(135deg, rgba(88, 28, 135, 0.14), rgba(15, 18, 28, 0.92));
+}
+.coach-pour-toi-title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: rgba(233, 213, 255, 0.95);
+  margin-bottom: 8px;
+}
+.coach-pour-toi-track {
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.coach-pour-toi-name {
+  color: rgba(255, 255, 255, 0.96);
+}
+.coach-pour-toi-sep {
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 500;
+}
+.coach-pour-toi-artist {
+  color: var(--text2);
+  font-weight: 500;
+}
+.coach-pour-toi-reason {
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: rgba(196, 181, 253, 0.92);
+  margin-bottom: 10px;
+}
+.coach-pour-toi-btn {
+  width: 100%;
+  margin-top: 2px;
+}
+
 .swipe-vote-wrap {
   margin: 2px 0 12px;
   display: grid;

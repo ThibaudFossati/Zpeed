@@ -31,6 +31,7 @@ const { tickSpotifyPipeline, initSpotifyPipelineState } = require('./lib/spotify
 const social = require('./lib/socialMusic');
 const userSocial = require('./lib/userSocialProfile');
 const softInfluence = require('./lib/softInfluence');
+const personalCoach = require('./lib/personalMusicCoach');
 
 const SPOTIFY_PRECREATE_STATE = '__precreate__';
 const TASTE_FILE = path.join(__dirname, 'taste-profiles.json');
@@ -1800,6 +1801,28 @@ app.get('/api/profile/:userId', (req, res) => {
   const row = userSocial.getRow(socialProfiles, uid);
   const taste = tasteProfiles[uid] || null;
   res.json(userSocial.buildPublicProfile(uid, row, taste, { preferredVibe }));
+});
+
+app.get('/api/session/:code/coach-suggest', async (req, res) => {
+  const code = String(req.params.code || '')
+    .trim()
+    .toUpperCase();
+  const userId = String(req.query.userId || '').trim();
+  const guestId = String(req.query.guestId || '').trim();
+  const s = sessions[code];
+  if (!s) return res.status(404).json({ ok: false });
+  if (!guestId || !Array.isArray(s.guests) || !s.guests.some(g => g && g.id === guestId)) {
+    return res.status(403).json({ ok: false, message: 'guest' });
+  }
+  try {
+    if (userId) ensureTasteProfile(userId);
+    const out = await personalCoach.computePersonalSuggestion(userId, guestId, s, tasteProfiles, socialProfiles, YouTube);
+    if (!out) return res.json({ ok: true, empty: true });
+    return res.json(out);
+  } catch (e) {
+    console.warn('coach-suggest:', e.message);
+    return res.status(500).json({ ok: false });
+  }
 });
 
 app.get('/api/search', async (req, res) => {
