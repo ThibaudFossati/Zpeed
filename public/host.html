@@ -1398,30 +1398,6 @@
   // The server handles token exchange and stores it in the session
   // Then redirects back to /host.html?code=XXXX&platform=spotify
 
-  async function fetchSpotifyProfile(token) {
-    try {
-      const res = await fetch('https://api.spotify.com/v1/me', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.status === 429) {
-        markSpotifyUnavailable('Spotify limite les requêtes. Réessaie dans quelques minutes.');
-        console.warn('[spotify] /v1/me rate-limited (429)');
-        return null;
-      }
-      if (res.status === 401 || res.status === 403) {
-        localStorage.removeItem('zpeed_spotify_token');
-        window._spotifyToken = null;
-        return null;
-      }
-      if (!res.ok) return null;
-      const me = await res.json();
-      return {
-        name:    me.display_name || me.id || 'Spotify',
-        picture: me.images?.[0]?.url || null
-      };
-    } catch(e) { return null; }
-  }
-
   /** Always prefer server session token; clear stale localStorage on 401/403/404. */
   async function syncSpotifyTokenFromServer() {
     try {
@@ -1464,7 +1440,7 @@
 
     const sync = await syncSpotifyTokenFromServer();
     if (sync.ok && sync.data?.access_token) {
-      const profile = sync.data.profile || await fetchSpotifyProfile(sync.data.access_token);
+      const profile = sync.data.profile || null;
       markConnected('spotify', profile);
       if (window._spotifyMockMode) {
         markSpotifyUnavailable('Mode test activé : tu peux chercher et ajouter des titres, mais la lecture Spotify est désactivée.');
@@ -1482,10 +1458,6 @@
         localStorage.removeItem('zpeed_spotify_token');
         window._spotifyToken = null;
       }
-    }
-
-    if (window._spotifyToken) {
-      fetchSpotifyProfile(window._spotifyToken).then(p => { if (p) markConnected('spotify', p); });
     }
 
     refreshSpotifyHostUi();
@@ -1558,24 +1530,31 @@
   }
 
   async function transferPlaybackToHostDevice(play = false) {
-    if (!window._spotifyToken || !window._spotifyDeviceId) return false;
+    if (!window._spotifyToken || !window._spotifyDeviceId || !hostSecret) return false;
     try {
-      const res = await fetch('https://api.spotify.com/v1/me/player', {
-        method: 'PUT',
-        body: JSON.stringify({ device_ids: [window._spotifyDeviceId], play: !!play }),
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window._spotifyToken}` }
+      const res = await fetch('/api/spotify/activate-sound', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          code,
+          secret: hostSecret,
+          deviceId: window._spotifyDeviceId,
+          trackUri: null
+        })
       });
-      if (res.status === 204 || res.status === 202) return true;
-      if (res.status === 429) {
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.ok) return true;
+      if (data?.rateLimited) {
         markSpotifyUnavailable('Spotify limite les requêtes. Réessaie dans quelques minutes.');
         showToast('Spotify indisponible pour le moment.');
         return false;
       }
-      if (res.status === 401 || res.status === 403) {
+      if (res.status === 401 || res.status === 403 || data?.reason === 'activation_failed') {
         showToast('Session Spotify expirée — reconnecte-toi.');
         return false;
       }
-      showToast('Impossible d’activer la lecture (erreur ' + res.status + ').');
+      if (play) showToast('Impossible d’activer la lecture.');
       return false;
     } catch (e) {
       showToast('Erreur réseau pendant l’activation.');
@@ -1584,58 +1563,85 @@
   }
 
   async function fetchCurrentSpotifyPlaybackState() {
-    if (!window._spotifyToken || window._spotifyMockMode) return null;
-    const res = await fetch('https://api.spotify.com/v1/me/player', {
-      headers: { 'Authorization': `Bearer ${window._spotifyToken}` }
+    if (!window._spotifyToken || window._spotifyMockMode || !hostSecret) return null;
+    const res = await fetch(`/api/player-state?code=${encodeURIComponent(code)}&secret=${encodeURIComponent(hostSecret)}`, {
+      credentials: 'same-origin'
     }).catch(() => null);
     if (!res) return null;
-    if (res.status === 429) {
-      markSpotifyUnavailable('Mode démo : recherche et file actives, son via Spotify requis');
+    const payload = await res.json().catch(() => null);
+    if (!payload?.ok) return null;
+    const state = payload.state || null;
+    if (state?.rateLimited) {
+      markSpotifyUnavailable('Synchronisation Spotify temporairement ralentie');
       return null;
     }
-    if (res.status === 204) return null;
-    if (res.status !== 200) return null;
-    return res.json().catch(() => null);
+    return state;
   }
 
   function applySpotifyPlaybackStateToUi(state) {
-    if (!state || !state.item) return;
-    const currentUri = state.item.uri || null;
+    if (!state || !state.track) return;
+    const currentUri = state.track.uri || null;
     if (currentUri && currentTrack?.spotifyUri && currentTrack.spotifyUri !== currentUri) {
       const fromQueue = queue.find(t => t.spotifyUri === currentUri || (t.spotifyId && `spotify:track:${t.spotifyId}` === currentUri));
       if (fromQueue) currentTrack = fromQueue;
     }
-    if (state.item.name) {
+    if (state.track.name) {
       const titleEl = document.getElementById('amTitle');
-      if (titleEl) titleEl.textContent = state.item.name;
+      if (titleEl) titleEl.textContent = state.track.name;
     }
-    if (Array.isArray(state.item.artists)) {
+    if (state.track.artist) {
       const artistEl = document.getElementById('amArtist');
-      if (artistEl) artistEl.textContent = state.item.artists.map(a => a.name).join(', ');
+      if (artistEl) artistEl.textContent = state.track.artist;
     }
-    if (state.item.album?.images?.[0]?.url) {
+    if (state.track.image) {
       const thumb = document.getElementById('amThumb');
-      if (thumb) thumb.src = state.item.album.images[0].url;
+      if (thumb) thumb.src = state.track.image;
     }
     const icon = document.getElementById('amPlayIcon');
     if (icon) {
-      if (state.is_playing) icon.innerHTML = '<rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/>';
+      if (state.isPlaying) icon.innerHTML = '<rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/>';
       else icon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
     }
     const progressFill = document.getElementById('amProgressFill');
     const progressWrap = document.getElementById('amProgress');
-    if (progressFill && progressWrap && Number.isFinite(state.progress_ms) && Number.isFinite(state.item.duration_ms) && state.item.duration_ms > 0) {
+    if (progressFill && progressWrap && Number.isFinite(state.progressMs) && Number.isFinite(state.track.durationMs) && state.track.durationMs > 0) {
       progressWrap.hidden = false;
-      progressFill.style.width = Math.max(0, Math.min(100, (state.progress_ms / state.item.duration_ms) * 100)) + '%';
+      progressFill.style.width = Math.max(0, Math.min(100, (state.progressMs / state.track.durationMs) * 100)) + '%';
     }
     refreshSpotifyHostUi();
   }
 
   async function syncSpotifyPlaybackUi() {
+    if (syncSpotifyPlaybackUi._pending) return null;
+    syncSpotifyPlaybackUi._pending = true;
     const state = await fetchCurrentSpotifyPlaybackState();
     if (state) applySpotifyPlaybackStateToUi(state);
+    syncSpotifyPlaybackUi._pending = false;
     return state;
   }
+
+  let playerStatePollInterval = null;
+  function startPlayerStatePolling() {
+    if (playerStatePollInterval || window._spotifyMockMode) return;
+    playerStatePollInterval = setInterval(() => {
+      if (document.hidden) return;
+      syncSpotifyPlaybackUi().catch(() => {});
+    }, 5000);
+  }
+  function stopPlayerStatePolling() {
+    if (!playerStatePollInterval) return;
+    clearInterval(playerStatePollInterval);
+    playerStatePollInterval = null;
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      stopPlayerStatePolling();
+      return;
+    }
+    syncSpotifyPlaybackUi().catch(() => {});
+    startPlayerStatePolling();
+  });
 
   async function activateSound() {
     if (_activateSoundPending) return;
@@ -2575,18 +2581,7 @@
       showToast('🎵 Spotify prêt — cet appareil joue sur l\'enceinte');
       socket.emit('host:spotify_device', { code, hostSecret, deviceId: device_id });
       refreshSpotifyHostUi();
-      const transferRes = await fetch('https://api.spotify.com/v1/me/player', {
-        method: 'PUT',
-        body: JSON.stringify({ device_ids: [device_id], play: false }),
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window._spotifyToken}` }
-      });
-      console.log('[spotify] transfer playback status:', transferRes.status);
-      if (transferRes.status === 429) {
-        markSpotifyUnavailable('Spotify limite les requêtes. Réessaie dans quelques minutes.');
-      }
-      if (transferRes.status === 401 || transferRes.status === 403) {
-        showToast('Session Spotify expirée — reconnecte-toi.');
-      }
+      await transferPlaybackToHostDevice(false);
     });
 
     player.addListener('player_state_changed', state => {
@@ -2661,19 +2656,25 @@
       return;
     }
     console.log('[spotify] playback attempt:', { uri, deviceId: window._spotifyDeviceId });
-    const res = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${window._spotifyDeviceId}`, {
-      method: 'PUT',
-      body: JSON.stringify({ uris: [uri] }),
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window._spotifyToken}` }
+    const res = await fetch('/api/spotify/activate-sound', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        code,
+        secret: hostSecret,
+        deviceId: window._spotifyDeviceId,
+        trackUri: uri
+      })
     }).catch(e => {
       console.warn('[spotify] playback request failed:', e.message);
       return null;
     });
     if (!res) return;
-    console.log('[spotify] playback response:', res.status);
-    if (res.status === 429) {
-      markSpotifyUnavailable('Spotify limite les requêtes. Réessaie dans quelques minutes.');
-      showToast('Trop de requêtes Spotify (429).');
+    const data = await res.json().catch(() => ({}));
+    if (data?.rateLimited || data?.reason === 'rate_limited') {
+      markSpotifyUnavailable('Synchronisation Spotify temporairement ralentie');
+      showToast('Synchronisation Spotify temporairement ralentie');
       return;
     }
     if (res.status === 401 || res.status === 403) {
@@ -3053,15 +3054,11 @@
       el.innerHTML = `<div class="empty"><div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div><div class="empty-text">File vide...</div></div>`;
       return;
     }
-    const maxVotes = Math.max(...queue.map(t => t.votes), 1);
     const th = roomMeta.voteThreshold != null ? roomMeta.voteThreshold : 2;
     const thNum = roomMeta.voteThreshold != null ? Number(roomMeta.voteThreshold) : NaN;
     const hostVoterKey = 'host:' + hostId;
     el.innerHTML = queue.map((t, i) => {
       const safeTr = JSON.stringify(t).replace(/"/g, '&quot;');
-      const pct    = Math.min(100, Math.max(4, (t.votes / maxVotes) * 100));
-      const color  = pct < 30 ? '#00d4c8' : pct < 60 ? '#C97B2E' : pct < 85 ? '#E85D2A' : '#FF3B1F';
-      const pulse  = pct >= 85 ? 'animation:heatPulse 1s infinite' : '';
       const voterList = t.voterNames || [];
       const voters = voterList.slice(0, 4).map(n =>
         `<img class="voter-av" src="${avatarUrl(n, 52)}" alt="${n}" title="${n}">`
@@ -3077,11 +3074,20 @@
       const stClass = 'status-' + stKey;
       const v = t.votes | 0;
       const heatTier = !Number.isNaN(thNum) ? zpeedHeatTierHost(v, thNum) : 'zpeed-heat-low';
-      const momPct = !Number.isNaN(thNum) ? Math.min(100, Math.round((Math.max(0, v) / Math.max(thNum, 1)) * 100)) : 0;
-      const momRow =
-        !Number.isNaN(thNum)
-          ? `<div class="zpeed-momentum-row"><div class="zpeed-momentum"><div class="zpeed-momentum-fill" style="width:${momPct}%"></div></div><span class="zpeed-momentum-lbl">${Math.max(0, v)}/${thNum}</span></div>`
-          : '';
+      const isPlayingNow = currentTrack && t.id === currentTrack.id;
+      const isValidated = t.status === 'accepted' || t.status === 'spotify_queued' || (!Number.isNaN(thNum) && v >= thNum);
+      const voteLabel = isPlayingNow
+        ? 'En lecture'
+        : isValidated
+          ? 'Validé · prêt à jouer'
+          : !Number.isNaN(thNum)
+            ? `👍 ${Math.max(0, v)} / ${thNum} votes`
+            : `👍 ${Math.max(0, v)} votes`;
+      const voteLabelClass = isPlayingNow
+        ? 'queue-vote-status queue-vote-status--playing'
+        : isValidated
+          ? 'queue-vote-status queue-vote-status--ready'
+          : 'queue-vote-status queue-vote-status--pending';
       return `
         <div class="queue-item track-card ${stClass} ${heatTier}" id="qrow-${t.id}" data-track-id="${t.id || ''}">
           <div class="zpeed-react-layer" aria-hidden="true"></div>
@@ -3092,12 +3098,9 @@
             <div class="queue-title">${t.title}</div>
             <div class="queue-meta">${t.channel}${st ? ` · <span style="color:var(--purple-light);font-weight:600">${st}</span>` : ''}</div>
             <div class="queue-proposer">${t.proposedBy === '🎧 Host' ? '🎧 Host' : '🎤 ' + t.proposedBy}</div>
-            ${momRow}
+            <div class="${voteLabelClass}">${voteLabel}</div>
             ${voters ? `<div class="voter-avatars">${voters}</div>` : ''}
             ${voteBtns}
-            <div class="heat-bar">
-              <div class="heat-fill" style="width:${pct}%;background:${color};${pulse}"></div>
-            </div>
           </div>
           <div class="queue-item--actions">
             <button type="button" class="sugg-related-btn queue-related-btn" onclick="event.stopPropagation();showRelatedTracks(${safeTr})" aria-label="Morceaux liés">Liés</button>
@@ -3281,6 +3284,8 @@
 
   checkPlatforms();
   initSpotifySDK(); // try to init if already connected
+  syncSpotifyPlaybackUi().catch(() => {});
+  startPlayerStatePolling();
 
   // ─────────────────────────────────────────────
   // 3D CAROUSEL — legacy vars kept for compatibility

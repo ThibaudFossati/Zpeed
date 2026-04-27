@@ -1420,6 +1420,22 @@ body.zpeed-idle #queueList .queue-item.zpeed-nudge-target {
   color: rgba(255,255,255,0.42);
   flex-shrink: 0;
 }
+.queue-vote-status {
+  margin-top: 6px;
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  color: rgba(255,255,255,0.72);
+}
+.queue-vote-status--pending {
+  color: rgba(255,255,255,0.72);
+}
+.queue-vote-status--ready {
+  color: rgba(29,185,84,0.82);
+}
+.queue-vote-status--playing {
+  color: rgba(147,197,255,0.86);
+}
 /* Vote heat tiers (vote count vs threshold) */
 .vote-card.zpeed-heat-low { box-shadow: none; }
 .vote-card.zpeed-heat-med {
