@@ -321,6 +321,9 @@
       z-index: 90;
       margin: 0 auto;
     }
+    .am-bar.am-bar--loading {
+      border-color: rgba(139,233,210,0.42);
+    }
     .am-bar.visible { display: flex; }
     .am-playback-hint {
       font-size: 0.70rem;
@@ -1551,16 +1554,22 @@
     return false;
   }
 
+  let _activateSoundPending = false;
+  let _activateSoundAttempt = 0;
+
   function spotifyActivationUiPending(pending) {
     const btn = document.getElementById('amActivateMusicBtn');
+    const bar = document.getElementById('amBar');
     if (!btn) return;
+    if (bar) bar.classList.toggle('am-bar--loading', !!pending);
     if (pending) {
       btn.disabled = true;
-      btn.textContent = 'Activation...';
+      btn.textContent = 'Activation du son...';
       return;
     }
     btn.disabled = false;
-    btn.textContent = 'Activer le son';
+    if (_activateSoundAttempt >= 3) btn.textContent = 'Réessayer';
+    else btn.textContent = 'Activer le son';
   }
 
   async function waitForSpotifyDeviceReady(timeoutMs) {
@@ -1653,15 +1662,20 @@
   }
 
   async function activateSound() {
+    if (_activateSoundPending) return;
+    _activateSoundPending = true;
     const st = getHostPlaybackUiState();
     if (st === 'mock') {
       showToast('Mode démo : recherche et file actives, son via Spotify requis');
+      _activateSoundPending = false;
       return;
     }
     if (st === 'no_spotify') {
       connectPlatform('spotify');
+      _activateSoundPending = false;
       return;
     }
+    _activateSoundAttempt = 0;
     spotifyActivationUiPending(true);
     try {
       if (!window._spotifyToken) {
@@ -1672,9 +1686,7 @@
         await initSpotifySDK();
         const ok = await waitForSpotifyDeviceReady(2600);
         if (!ok) {
-          showToast('Impossible d’activer le son automatiquement. Ouvre Spotify une fois, puis choisis SONDER — instories.');
-          openAmDeviceHelp('setup');
-          return;
+          // continue with retries against activation endpoint
         }
       }
       let fallbackTrack = currentTrack?.spotifyUri || null;
@@ -1683,38 +1695,62 @@
         const queuedSpotify = queue.find(t => t.spotifyUri || t.spotifyId);
         if (queuedSpotify) fallbackTrack = queuedSpotify.spotifyUri || `spotify:track:${queuedSpotify.spotifyId}`;
       }
+      const hasTrackToPlay = !!fallbackTrack;
       const payload = {
         code,
         secret: hostSecret,
         deviceId: window._spotifyDeviceId,
         trackUri: fallbackTrack
       };
-      const res = await fetch('/api/spotify/activate-sound', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify(payload)
-      }).catch(() => null);
-      if (!res) {
-        showToast('Impossible d’activer le son automatiquement. Ouvre Spotify une fois, puis choisis SONDER — instories.');
-        return;
-      }
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) {
+      for (let i = 0; i < 3; i++) {
+        _activateSoundAttempt = i + 1;
+        const stateHelper = document.getElementById('amStateHelper');
+        if (stateHelper) stateHelper.textContent = 'Recherche du lecteur...';
+        const res = await fetch('/api/spotify/activate-sound', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify(payload)
+        }).catch(() => null);
+        if (!res) {
+          if (i < 2) {
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            continue;
+          }
+          showToast('Ouvre Spotify une fois, puis reviens ici.');
+          return;
+        }
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.ok) {
+          _activateSoundAttempt = 0;
+          if (data.playback) applySpotifyPlaybackStateToUi(data.playback);
+          await syncSpotifyPlaybackUi();
+          if (hasTrackToPlay) showToast('SONDER contrôle la musique');
+          else showToast('Ajoute un titre pour lancer la musique');
+          return;
+        }
+        if (data?.rateLimited || data?.reason === 'rate_limited') {
+          markSpotifyUnavailable('Spotify limite les requêtes. Réessaie dans quelques minutes.');
+          showToast('Spotify limite les requêtes. Réessaie dans quelques minutes.');
+          _activateSoundAttempt = 3;
+          return;
+        }
         if (data?.demoMode) {
           markSpotifyUnavailable('Mode démo : recherche et file actives, son via Spotify requis');
           showToast('Mode démo : recherche et file actives, son via Spotify requis');
-        } else {
-          showToast('Impossible d’activer le son automatiquement. Ouvre Spotify une fois, puis choisis SONDER — instories.');
+          _activateSoundAttempt = 3;
+          return;
         }
-        return;
+        if (i < 2) {
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          continue;
+        }
+        showToast('Ouvre Spotify une fois, puis reviens ici.');
       }
-      if (data.playback) applySpotifyPlaybackStateToUi(data.playback);
-      await syncSpotifyPlaybackUi();
-      showToast('SONDER contrôle Spotify');
     } finally {
       spotifyActivationUiPending(false);
       refreshSpotifyHostUi();
+      _activateSoundPending = false;
     }
   }
 
@@ -1731,21 +1767,28 @@
     if (amBar) amBar.classList.toggle('am-bar--simple', isSimple);
     if (activateBtn) {
       activateBtn.hidden = !(st === 'needs_device' || st === 'no_spotify');
-      activateBtn.textContent = st === 'no_spotify' ? 'Connecter Spotify' : 'Activer le son';
-      activateBtn.disabled = false;
+      activateBtn.textContent = st === 'no_spotify' ? 'Connecter Spotify' : (_activateSoundAttempt >= 3 ? 'Réessayer' : 'Activer le son');
+      activateBtn.disabled = _activateSoundPending;
     }
     if (statusLine) {
       statusLine.classList.remove('am-device-status--ready', 'am-device-status--warn', 'am-device-status--muted');
-      statusLine.textContent = '◉ SONDER 🎵';
-      if (st === 'ready') statusLine.classList.add('am-device-status--ready');
-      else if (st === 'needs_device' || st === 'rate_limited') statusLine.classList.add('am-device-status--warn');
-      else statusLine.classList.add('am-device-status--muted');
+      if (st === 'mock') {
+        statusLine.textContent = 'Mode démo';
+        statusLine.classList.add('am-device-status--muted');
+      } else {
+        statusLine.textContent = '◉ SONDER 🎵';
+        if (st === 'ready') statusLine.classList.add('am-device-status--ready');
+        else if (st === 'needs_device' || st === 'rate_limited') statusLine.classList.add('am-device-status--warn');
+        else statusLine.classList.add('am-device-status--muted');
+      }
     }
     if (stateHelper) {
       if (st === 'needs_device') {
-        stateHelper.textContent = 'SONDER va prendre le contrôle de Spotify pour lancer la musique.';
+        if (_activateSoundPending) stateHelper.textContent = 'Recherche du lecteur...';
+        else if (_activateSoundAttempt >= 3) stateHelper.textContent = 'Ouvre Spotify une fois, puis reviens ici. SONDER reprendra la lecture automatiquement.';
+        else stateHelper.textContent = 'SONDER va prendre le contrôle de Spotify pour lancer la musique.';
       } else if (st === 'mock') {
-        stateHelper.textContent = 'Recherche et file actives, lecture désactivée.';
+        stateHelper.textContent = 'Tu peux montrer la recherche et la file. Le son nécessite Spotify.';
       } else if (st === 'rate_limited') {
         stateHelper.textContent = 'Spotify limite les requêtes pour le moment.';
       } else {

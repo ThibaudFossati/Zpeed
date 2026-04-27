@@ -651,6 +651,7 @@ app.post('/api/spotify/activate-sound', async (req, res) => {
     return res.status(200).json({
       ok: false,
       demoMode: true,
+      reason: 'demo_mode',
       message: 'Mode démo : recherche et file actives, son via Spotify requis'
     });
   }
@@ -666,13 +667,15 @@ app.post('/api/spotify/activate-sound', async (req, res) => {
     if ((ensure.status || 0) === 429) {
       return res.status(200).json({
         ok: false,
-        demoMode: true,
-        message: 'Mode démo : recherche et file actives, son via Spotify requis'
+        rateLimited: true,
+        reason: 'rate_limited',
+        message: 'Spotify limite les requêtes. Réessaie dans quelques minutes.'
       });
     }
     return res.status(200).json({
       ok: false,
-      message: 'Impossible d’activer le son automatiquement. Ouvre Spotify une fois, puis choisis SONDER — instories.'
+      reason: 'activation_failed',
+      message: 'Ouvre Spotify une fois, puis reviens ici.'
     });
   }
   if (ensure.refreshed) saveSessions();
@@ -681,7 +684,8 @@ app.post('/api/spotify/activate-sound', async (req, res) => {
   if (!selectedDeviceId) {
     return res.status(200).json({
       ok: false,
-      message: 'Impossible d’activer le son automatiquement. Ouvre Spotify une fois, puis choisis SONDER — instories.'
+      reason: 'device_not_ready',
+      message: 'Ouvre Spotify une fois, puis reviens ici.'
     });
   }
 
@@ -701,14 +705,19 @@ app.post('/api/spotify/activate-sound', async (req, res) => {
     if (transferRes.status === 429 || transferRes.status === 403 || transferRes.status === 404) {
       return res.status(200).json({
         ok: false,
-        demoMode: true,
-        message: 'Mode démo : recherche et file actives, son via Spotify requis'
+        reason: transferRes.status === 429 ? 'rate_limited' : 'device_not_ready',
+        rateLimited: transferRes.status === 429,
+        demoMode: transferRes.status !== 429,
+        message: transferRes.status === 429
+          ? 'Spotify limite les requêtes. Réessaie dans quelques minutes.'
+          : 'Ouvre Spotify une fois, puis reviens ici.'
       });
     }
     if (transferRes.status < 200 || transferRes.status >= 300) {
       return res.status(200).json({
         ok: false,
-        message: 'Impossible d’activer le son automatiquement. Ouvre Spotify une fois, puis choisis SONDER — instories.'
+        reason: 'activation_failed',
+        message: 'Ouvre Spotify une fois, puis reviens ici.'
       });
     }
 
@@ -718,13 +727,18 @@ app.post('/api/spotify/activate-sound', async (req, res) => {
         if (playRes.status === 429 || playRes.status === 403 || playRes.status === 404) {
           return res.status(200).json({
             ok: false,
-            demoMode: true,
-            message: 'Mode démo : recherche et file actives, son via Spotify requis'
+            reason: playRes.status === 429 ? 'rate_limited' : 'device_not_ready',
+            rateLimited: playRes.status === 429,
+            demoMode: playRes.status !== 429,
+            message: playRes.status === 429
+              ? 'Spotify limite les requêtes. Réessaie dans quelques minutes.'
+              : 'Ouvre Spotify une fois, puis reviens ici.'
           });
         }
         return res.status(200).json({
           ok: false,
-          message: 'Impossible d’activer le son automatiquement. Ouvre Spotify une fois, puis choisis SONDER — instories.'
+          reason: 'activation_failed',
+          message: 'Ouvre Spotify une fois, puis reviens ici.'
         });
       }
     }
@@ -742,7 +756,8 @@ app.post('/api/spotify/activate-sound', async (req, res) => {
   } catch (e) {
     return res.status(200).json({
       ok: false,
-      message: 'Impossible d’activer le son automatiquement. Ouvre Spotify une fois, puis choisis SONDER — instories.'
+      reason: 'activation_failed',
+      message: 'Ouvre Spotify une fois, puis reviens ici.'
     });
   }
 });
