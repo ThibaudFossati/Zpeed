@@ -302,33 +302,26 @@
       margin-top: 4px;
     }
 
-    /* ── Apple Music Bottom Bar ── */
+    /* ── SONDER Live Player Card ── */
     .am-bar {
       position: fixed;
-      bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-      left: 10px; right: 10px;
+      bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(92vw, 420px);
       min-height: 66px;
-      background: rgba(18, 22, 36, 0.82);
-      backdrop-filter: blur(32px);
-      -webkit-backdrop-filter: blur(32px);
-      border: 1px solid rgba(255,255,255,0.09);
-      border-radius: 20px;
-      display: none; /* shown when track plays */
+      background: linear-gradient(160deg, rgba(24, 27, 44, 0.96), rgba(13, 16, 30, 0.96));
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 32px;
+      display: none;
       flex-direction: column;
       align-items: stretch;
-      padding: 8px 10px;
-      gap: 6px;
+      padding: 14px;
+      gap: 10px;
       z-index: 90;
-      max-width: 480px;
       margin: 0 auto;
     }
     .am-bar.visible { display: flex; }
-    .am-bar-row {
-      display: flex;
-      align-items: center;
-      width: 100%;
-      gap: 4px;
-    }
     .am-playback-hint {
       font-size: 0.70rem;
       line-height: 1.3;
@@ -337,28 +330,101 @@
       padding: 0 2px 2px;
       flex-shrink: 0;
     }
-    .am-playback-hint[hidden] {
-      display: none !important;
-    }
+    .am-playback-hint[hidden] { display: none !important; }
     .am-playback-hint--tap {
       cursor: pointer;
       color: var(--text2);
       text-decoration: underline;
       text-underline-offset: 2px;
     }
-    .am-btn.am-btn--locked {
-      opacity: 0.45;
-      pointer-events: none;
+    .am-artwork {
+      width: min(78%, 290px);
+      aspect-ratio: 1 / 1;
+      border-radius: 22px;
+      object-fit: cover;
+      margin: 2px auto 0;
+      background: linear-gradient(145deg, rgba(43,48,78,0.9), rgba(22,26,45,0.9));
+      border: 1px solid rgba(255,255,255,0.12);
     }
-    .am-btn.am-btn--locked:active {
-      transform: none;
-      background: transparent;
+    .am-track-meta { text-align: center; padding: 2px 4px 0; }
+    .am-track-title {
+      font-size: clamp(1.08rem, 3.9vw, 1.34rem);
+      line-height: 1.18;
+      font-weight: 760;
+      color: var(--text);
+      letter-spacing: 0.01em;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-
-    /* Transport — left */
-    .am-transport {
-      display: flex; align-items: center; gap: 4px;
-      flex-shrink: 0;
+    .am-track-artist {
+      margin-top: 4px;
+      font-size: 0.82rem;
+      color: var(--text2);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .am-device-status {
+      margin-top: 8px;
+      font-size: 0.78rem;
+      font-weight: 620;
+      color: #8f96ac;
+      text-align: center;
+      letter-spacing: 0.01em;
+    }
+    .am-device-status--ready { color: #44d27d; }
+    .am-device-status--warn { color: #f8bf5b; }
+    .am-device-status--muted { color: #9aa0b2; }
+    .am-state-helper {
+      font-size: 0.75rem;
+      color: var(--text2);
+      text-align: center;
+      min-height: 16px;
+    }
+    .am-progress {
+      width: 100%;
+      height: 3px;
+      margin-top: 2px;
+      background: rgba(255,255,255,0.16);
+      overflow: hidden;
+      border-radius: 999px;
+    }
+    .am-progress-fill {
+      width: 0%; height: 100%;
+      background: linear-gradient(90deg, #ffffff, #8BE9D2);
+      transition: width 0.35s linear;
+    }
+    .am-progress[hidden] { display: none !important; }
+    .am-activate-btn {
+      width: 100%;
+      min-height: 44px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.16);
+      background: rgba(167,139,250,0.20);
+      color: var(--text);
+      font-weight: 700;
+      font-size: 0.90rem;
+      letter-spacing: 0.01em;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .am-activate-btn:active {
+      transform: scale(0.995);
+      background: rgba(167,139,250,0.28);
+    }
+    .am-activate-btn[hidden] { display: none !important; }
+    .am-controls-primary {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+      margin-top: 2px;
+    }
+    .am-controls-secondary {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      margin-top: -2px;
     }
     .am-btn {
       width: 40px; height: 40px;
@@ -370,69 +436,21 @@
       transition: background 0.12s, transform 0.1s;
       flex-shrink: 0;
     }
-    .am-btn:active { transform: scale(0.88); background: rgba(255,255,255,0.10); }
+    .am-btn:active { transform: scale(0.93); background: rgba(255,255,255,0.10); }
     .am-btn svg { display: block; }
-
-    /* Center track pill */
-    .am-track-pill {
-      flex: 1; min-width: 0;
-      height: 52px;
-      background: rgba(10, 12, 22, 0.85);
-      border-radius: 13px;
-      display: flex;
-      align-items: center;
-      padding: 0 8px 0 5px;
-      gap: 8px;
-      position: relative;
-      overflow: hidden;
+    .am-btn--lg { width: 56px; height: 56px; }
+    .am-btn--sm { width: 34px; height: 34px; color: var(--text2); }
+    .am-btn.am-btn--locked {
+      opacity: 0.45;
+      pointer-events: none;
     }
-    .am-thumb {
-      width: 42px; height: 42px;
-      border-radius: 9px;
-      object-fit: cover; flex-shrink: 0;
-      background: var(--bg3);
+    .am-btn.am-btn--locked:active {
+      transform: none;
+      background: transparent;
     }
-    .am-track-info { flex: 1; min-width: 0; }
-    .am-track-artist {
-      font-size: 0.80rem; font-weight: 700;
-      color: var(--text);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .am-track-title {
-      font-size: 0.70rem; color: var(--text2); font-weight: 400;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      margin-top: 1px;
-    }
-    .am-wv-btn, .am-dots-btn {
-      flex-shrink: 0;
-      width: 30px; height: 30px;
-      background: none; border: none;
-      display: flex; align-items: center; justify-content: center;
-      cursor: pointer; color: var(--text2);
-      border-radius: 50%;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .am-wv-btn:active, .am-dots-btn:active { background: rgba(255,255,255,0.08); }
-    /* Progress bar inside the pill — bottom */
-    .am-progress {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 2px;
-      background: rgba(255,255,255,0.10);
-      border-radius: 0 0 13px 13px;
-    }
-    .am-progress-fill {
-      height: 100%;
-      background: var(--purple-light);
-      border-radius: 0 0 13px 13px;
-      width: 0%;
-      transition: width 1s linear;
-    }
-
-    /* Utilities — right */
-    .am-utilities {
-      display: flex; align-items: center; gap: 2px;
-      flex-shrink: 0;
+    .am-bar.am-bar--simple .am-controls-primary,
+    .am-bar.am-bar--simple .am-controls-secondary {
+      display: none !important;
     }
 
     /* ── Code + Share Apple pill ── */
@@ -1076,70 +1094,43 @@
   <!-- ═══ APPLE MUSIC PLAYER BAR ═══ -->
   <div class="am-bar" id="amBar">
     <div class="am-playback-hint" id="amPlaybackHint" hidden></div>
-    <div class="am-bar-row">
-    <!-- Left: transport controls -->
-    <div class="am-transport">
-      <button type="button" class="am-btn" id="amPrevBtn" onclick="carouselPrev()">
+    <button type="button" class="am-activate-btn" id="amActivateMusicBtn" onclick="activateSpotifyMusicOneTap()" hidden>Activer la musique</button>
+    <img class="am-artwork" id="amThumb" src="" alt="Artwork en cours" onerror="this.onerror=null;if(typeof THUMB_FALLBACK!=='undefined')this.src=THUMB_FALLBACK">
+    <div class="am-track-meta">
+      <div class="am-track-title" id="amTitle">—</div>
+      <div class="am-track-artist" id="amArtist">—</div>
+      <div class="am-device-status" id="amDeviceStatus">◉ SONDER 🎵</div>
+      <div class="am-state-helper" id="amStateHelper"></div>
+    </div>
+    <div class="am-controls-primary">
+      <button type="button" class="am-btn" id="amPrevBtn" onclick="carouselPrev()" aria-label="Titre précédent">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
           <polygon points="19 20 9 12 19 4 19 20"/>
           <rect x="5" y="4" width="2.5" height="16" rx="1.25"/>
         </svg>
       </button>
-      <button type="button" class="am-btn" id="amPlayBtn" onclick="togglePlayPause()" style="width:44px;height:44px">
+      <button type="button" class="am-btn am-btn--lg" id="amPlayBtn" onclick="togglePlayPause()" aria-label="Lecture / Pause">
         <svg id="amPlayIcon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
           <polygon points="5 3 19 12 5 21 5 3"/>
         </svg>
       </button>
-      <button type="button" class="am-btn" id="amSkipBtn" onclick="skipTrack()">
+      <button type="button" class="am-btn" id="amSkipBtn" onclick="skipTrack()" aria-label="Titre suivant">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
           <polygon points="5 4 15 12 5 20 5 4"/>
           <rect x="16.5" y="4" width="2.5" height="16" rx="1.25"/>
         </svg>
       </button>
     </div>
-
-    <!-- Center: track info pill -->
-    <div class="am-track-pill">
-      <img class="am-thumb" id="amThumb" src="" onerror="this.onerror=null;if(typeof THUMB_FALLBACK!=='undefined')this.src=THUMB_FALLBACK">
-      <div class="am-track-info">
-        <div class="am-track-artist" id="amArtist">—</div>
-        <div class="am-track-title"  id="amTitle">—</div>
-      </div>
-      <!-- Waveform icon -->
-      <button class="am-wv-btn" onclick="switchTab('playing')">
-        <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
-          <rect x="0"  y="5" width="2" height="4"  rx="1" fill="currentColor" opacity="0.5"/>
-          <rect x="3"  y="3" width="2" height="8"  rx="1" fill="currentColor" opacity="0.7"/>
-          <rect x="6"  y="0" width="2" height="14" rx="1" fill="currentColor"/>
-          <rect x="9"  y="2" width="2" height="10" rx="1" fill="currentColor" opacity="0.85"/>
-          <rect x="12" y="4" width="2" height="6"  rx="1" fill="currentColor" opacity="0.6"/>
-          <rect x="15" y="6" width="2" height="2"  rx="1" fill="currentColor" opacity="0.4"/>
-        </svg>
-      </button>
-      <!-- Dots -->
-      <button class="am-dots-btn">
-        <svg width="16" height="4" viewBox="0 0 16 4" fill="currentColor">
-          <circle cx="2" cy="2" r="1.5"/>
-          <circle cx="8" cy="2" r="1.5"/>
-          <circle cx="14" cy="2" r="1.5"/>
-        </svg>
-      </button>
-      <div class="am-progress"><div class="am-progress-fill" id="amProgressFill"></div></div>
-    </div>
-
-    <!-- Right: utility controls -->
-    <div class="am-utilities">
-      <!-- Appareil Spotify / aide lecture -->
-      <button type="button" class="am-btn" id="amDeviceBtn" onclick="openAmDeviceButton()" aria-label="Appareil Spotify et aide lecture">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <div class="am-controls-secondary">
+      <button type="button" class="am-btn am-btn--sm" id="amDeviceBtn" onclick="openAmDeviceButton()" aria-label="Appareil Spotify et aide lecture">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/>
           <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12" y2="20"/>
           <polygon points="10 22 14 22 12 19 10 22"/>
         </svg>
       </button>
-      <!-- EQ sliders -->
-      <button type="button" class="am-btn" onclick="switchTab('queue')">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+      <button type="button" class="am-btn am-btn--sm" onclick="switchTab('queue')" aria-label="Ouvrir la file">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
           <line x1="4" y1="6"  x2="20" y2="6"/>
           <line x1="4" y1="12" x2="20" y2="12"/>
           <line x1="4" y1="18" x2="20" y2="18"/>
@@ -1148,15 +1139,20 @@
           <circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/>
         </svg>
       </button>
-      <!-- Volume -->
-      <button type="button" class="am-btn" id="amVolumeBtn" onclick="cycleSpotifyVolume()">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <button type="button" class="am-btn am-btn--sm" onclick="openShare()" aria-label="Partager">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+          <line x1="8.7" y1="13.4" x2="15.3" y2="17.2"/><line x1="15.3" y1="6.8" x2="8.7" y2="10.6"/>
+        </svg>
+      </button>
+      <button type="button" class="am-btn am-btn--sm" id="amVolumeBtn" onclick="cycleSpotifyVolume()" aria-label="Volume">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
           <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
         </svg>
       </button>
     </div>
-    </div><!-- /am-bar-row -->
+    <div class="am-progress" id="amProgress" hidden><div class="am-progress-fill" id="amProgressFill"></div></div>
   </div>
 
   <!-- ═══ PANEL : GUESTS ═══ -->
@@ -1555,11 +1551,129 @@
     return false;
   }
 
+  function spotifyActivationUiPending(pending) {
+    const btn = document.getElementById('amActivateMusicBtn');
+    if (!btn) return;
+    if (pending) {
+      btn.disabled = true;
+      btn.textContent = 'Activation...';
+      return;
+    }
+    btn.disabled = false;
+    btn.textContent = 'Activer la musique';
+  }
+
+  async function waitForSpotifyDeviceReady(timeoutMs) {
+    const startedAt = Date.now();
+    while ((Date.now() - startedAt) < timeoutMs) {
+      if (hostSpotifyPlaybackDeviceReady()) return true;
+      await new Promise(resolve => setTimeout(resolve, 180));
+    }
+    return hostSpotifyPlaybackDeviceReady();
+  }
+
+  async function transferPlaybackToHostDevice(play = false) {
+    if (!window._spotifyToken || !window._spotifyDeviceId) return false;
+    try {
+      const res = await fetch('https://api.spotify.com/v1/me/player', {
+        method: 'PUT',
+        body: JSON.stringify({ device_ids: [window._spotifyDeviceId], play: !!play }),
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window._spotifyToken}` }
+      });
+      if (res.status === 204 || res.status === 202) return true;
+      if (res.status === 429) {
+        markSpotifyUnavailable('Spotify limite les requêtes. Réessaie dans quelques minutes.');
+        showToast('Spotify indisponible pour le moment.');
+        return false;
+      }
+      if (res.status === 401 || res.status === 403) {
+        showToast('Session Spotify expirée — reconnecte-toi.');
+        return false;
+      }
+      showToast('Impossible d’activer la lecture (erreur ' + res.status + ').');
+      return false;
+    } catch (e) {
+      showToast('Erreur réseau pendant l’activation.');
+      return false;
+    }
+  }
+
+  async function activateSpotifyMusicOneTap() {
+    const st = getHostPlaybackUiState();
+    if (st === 'mock') {
+      showToast('Mode test : lecture Spotify désactivée.');
+      return;
+    }
+    if (st === 'no_spotify') {
+      connectPlatform('spotify');
+      return;
+    }
+    spotifyActivationUiPending(true);
+    try {
+      if (!window._spotifyToken) {
+        showToast('Connecte Spotify pour activer la musique.');
+        return;
+      }
+      if (!hostSpotifyPlaybackDeviceReady()) {
+        await initSpotifySDK();
+        const ok = await waitForSpotifyDeviceReady(2600);
+        if (!ok) {
+          showToast('Si ça ne fonctionne pas, ouvre Spotify une fois.');
+          openAmDeviceHelp('setup');
+          return;
+        }
+      }
+      const moved = await transferPlaybackToHostDevice(false);
+      if (!moved) {
+        showToast('Si ça ne fonctionne pas, ouvre Spotify une fois.');
+        return;
+      }
+      if (currentTrack?.spotifyUri) {
+        await playSpotifyTrack(currentTrack.spotifyUri);
+        showToast('Musique activée');
+      } else {
+        showToast('Lecture activée. Ajoute un titre Spotify pour démarrer.');
+      }
+    } finally {
+      spotifyActivationUiPending(false);
+      refreshSpotifyHostUi();
+    }
+  }
+
   function applyAmBarPlaybackUi() {
     const hint = document.getElementById('amPlaybackHint');
+    const amBar = document.getElementById('amBar');
+    const activateBtn = document.getElementById('amActivateMusicBtn');
+    const stateHelper = document.getElementById('amStateHelper');
+    const statusLine = document.getElementById('amDeviceStatus');
     const locked = hostAmBarTransportLocked();
     const st = getHostPlaybackUiState();
     const deviceBtn = document.getElementById('amDeviceBtn');
+    const isSimple = st !== 'ready';
+    if (amBar) amBar.classList.toggle('am-bar--simple', isSimple);
+    if (activateBtn) {
+      activateBtn.hidden = !(st === 'needs_device' || st === 'no_spotify');
+      activateBtn.textContent = st === 'no_spotify' ? 'Connecter Spotify' : 'Activer la musique';
+      activateBtn.disabled = false;
+    }
+    if (statusLine) {
+      statusLine.classList.remove('am-device-status--ready', 'am-device-status--warn', 'am-device-status--muted');
+      statusLine.textContent = '◉ SONDER 🎵';
+      if (st === 'ready') statusLine.classList.add('am-device-status--ready');
+      else if (st === 'needs_device' || st === 'rate_limited') statusLine.classList.add('am-device-status--warn');
+      else statusLine.classList.add('am-device-status--muted');
+    }
+    if (stateHelper) {
+      if (st === 'needs_device') {
+        stateHelper.textContent = 'Ouvre Spotify puis choisis SONDER comme appareil.';
+      } else if (st === 'mock') {
+        stateHelper.textContent = 'Recherche et file actives, lecture désactivée.';
+      } else if (st === 'rate_limited') {
+        stateHelper.textContent = 'Spotify limite les requêtes pour le moment.';
+      } else {
+        stateHelper.textContent = '';
+      }
+    }
     ['amPrevBtn', 'amPlayBtn', 'amSkipBtn', 'amVolumeBtn'].forEach(id => {
       const btn = document.getElementById(id);
       if (!btn) return;
@@ -1606,6 +1720,9 @@
           e.preventDefault();
           openAmDeviceHelp('setup');
         };
+      } else if (st === 'no_spotify') {
+        hint.hidden = false;
+        hint.textContent = 'Connecte Spotify puis appuie sur le bouton pour lancer la musique.';
       } else if (st === 'rate_limited') {
         hint.hidden = false;
         hint.textContent = 'Spotify limite les requêtes. Réessaie dans quelques minutes.';
@@ -1637,27 +1754,12 @@
       showToast('Appareil Spotify non prêt.');
       return;
     }
-    fetch('https://api.spotify.com/v1/me/player', {
-      method: 'PUT',
-      body: JSON.stringify({ device_ids: [window._spotifyDeviceId], play: false }),
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${window._spotifyToken}` }
-    }).then(res => {
-      if (res.status === 204 || res.status === 202) {
+    transferPlaybackToHostDevice(false).then(ok => {
+      if (ok) {
         showToast('Lecture basculée vers cet appareil');
         closeModal('amDeviceHelpModal');
-        return;
       }
-      if (res.status === 429) {
-        markSpotifyUnavailable('Spotify limite les requêtes. Réessaie dans quelques minutes.');
-        showToast('Trop de requêtes Spotify — réessaie plus tard');
-        return;
-      }
-      if (res.status === 401 || res.status === 403) {
-        showToast('Session Spotify expirée — reconnecte-toi.');
-        return;
-      }
-      showToast('Impossible de basculer la lecture (erreur ' + res.status + ')');
-    }).catch(() => showToast('Erreur réseau'));
+    });
   }
 
   function openAmDeviceHelp(kind) {
@@ -3128,11 +3230,25 @@
 
   function updateAmBar(track) {
     if (!track) { document.getElementById('amBar').classList.remove('visible'); applyAmBarPlaybackUi(); return; }
+    const bar = document.getElementById('amBar');
+    const art = document.getElementById('amThumb');
+    const artUrl = track.thumbnail || '';
     document.getElementById('amBar').classList.add('visible');
-    document.getElementById('amThumb').src              = track.thumbnail || '';
-    document.getElementById('amThumb').onerror          = function() { this.src = THUMB_FALLBACK; };
-    document.getElementById('amArtist').textContent     = track.channel   || '—';
-    document.getElementById('amTitle').textContent      = track.title     || '—';
+    if (art) {
+      art.src = artUrl;
+      art.onerror = function() { this.src = THUMB_FALLBACK; };
+    }
+    document.getElementById('amArtist').textContent = track.channel || 'SONDER';
+    document.getElementById('amTitle').textContent = track.title || 'SONDER';
+    if (bar) {
+      if (artUrl) {
+        bar.style.background = `linear-gradient(160deg, rgba(22,26,42,0.86), rgba(14,18,31,0.92)), url("${artUrl}") center/cover no-repeat`;
+      } else {
+        bar.style.background = 'linear-gradient(160deg, rgba(24, 27, 44, 0.96), rgba(13, 16, 30, 0.96))';
+      }
+    }
+    const progress = document.getElementById('amProgress');
+    if (progress) progress.hidden = !(track.duration_ms || track.preview);
     applyAmBarPlaybackUi();
   }
 
@@ -3232,6 +3348,8 @@
 
   function startProgressSim() {
     stopProgressSim();
+    const progress = document.getElementById('amProgress');
+    if (progress) progress.hidden = false;
     progressStart = Date.now();
     progressInterval = setInterval(() => {
       const elapsed = (Date.now() - progressStart) / 1000;
@@ -3247,6 +3365,8 @@
 
   function stopProgressSim() {
     if (progressInterval) { clearInterval(progressInterval); progressInterval = null; }
+    const fill = document.getElementById('amProgressFill');
+    if (fill) fill.style.width = '0%';
   }
 
   (function initZpeedIdleNudgeHost() {
