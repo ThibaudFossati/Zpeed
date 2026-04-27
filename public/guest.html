@@ -284,6 +284,10 @@
     </div>
 
     <div class="section-title" style="display:flex;align-items:center;gap:7px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.6;flex-shrink:0"><rect x="3" y="4" width="18" height="2.5" rx="1.25"/><rect x="3" y="10.75" width="18" height="2.5" rx="1.25"/><rect x="3" y="17.5" width="12" height="2.5" rx="1.25"/></svg> File d'attente <span id="queueCount" style="color:var(--purple-light)"></span></div>
+    <div class="session-vibe-block">
+      <div id="sessionVibeGuest" class="queue-flow-tagline">Ambiance : Mix</div>
+      <div id="sessionVibeGuestSub" class="queue-flow-sub">Basé sur les personnes présentes</div>
+    </div>
     <div id="queueList">
       <div class="empty">
         <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
@@ -391,12 +395,22 @@
 </div>
 
 <script>
+  function getOrCreatePersistentUserId() {
+    let uid = localStorage.getItem('zpeed_user_id');
+    if (!uid) {
+      uid = 'u_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+      localStorage.setItem('zpeed_user_id', uid);
+    }
+    return uid;
+  }
+
   const urlCode    = new URLSearchParams(window.location.search).get('code');
   const storedCode = localStorage.getItem('zpeed_code');
   const code       = urlCode || storedCode;
   const guestId    = localStorage.getItem('zpeed_guestId');
   const guestName  = localStorage.getItem('zpeed_guestName') || 'Guest';
   const hostName   = localStorage.getItem('zpeed_hostName') || 'Host';
+  const userId     = getOrCreatePersistentUserId();
 
   if (!code || !guestId) {
     window.location.href = window.location.origin + '/index.html?code=' + encodeURIComponent(code || '');
@@ -412,7 +426,7 @@
   document.getElementById('statHost').textContent      = hostName;
 
   const socket = io();
-  function joinRoom() { socket.emit('guest:join', { code, guestId, guestName }); }
+  function joinRoom() { socket.emit('guest:join', { code, guestId, guestName, userId }); }
   socket.on('connect', joinRoom);
 
   let queue         = [];
@@ -554,7 +568,7 @@
     const dedupeKey = track.spotifyId || track.videoId || `${track.title}|${track.channel || ''}`;
     if (proposedTracks.has(dedupeKey)) { return; }
     proposedTracks.add(dedupeKey);
-    socket.emit('track:propose', { code, guestId, guestName, track });
+    socket.emit('track:propose', { code, guestId, guestName, track, userId });
     document.getElementById('searchResults').innerHTML = '';
     document.getElementById('searchInput').value = '';
     statProposed++;
@@ -603,7 +617,7 @@
     if (votedTracks.has(trackId)) { showToast('⚠️ Déjà swipé !'); return; }
     votedTracks.add(trackId);
     const direction = value > 0 ? 'like' : 'skip';
-    socket.emit('track:swipe', { code, trackId, guestId, guestName, direction });
+    socket.emit('track:swipe', { code, trackId, guestId, guestName, direction, userId });
     statVoted++;
     document.getElementById('statVoted').textContent = statVoted;
     // Haptic feedback
@@ -621,7 +635,7 @@
     if (!trackId || !direction) return;
     if (votedTracks.has(trackId)) return;
     votedTracks.add(trackId);
-    socket.emit('track:swipe', { code, trackId, guestId, guestName, direction });
+    socket.emit('track:swipe', { code, trackId, guestId, guestName, direction, userId });
     statVoted++;
     document.getElementById('statVoted').textContent = statVoted;
     if (navigator.vibrate) navigator.vibrate(direction === 'like' ? [25] : [12, 8, 12]);
@@ -904,6 +918,7 @@
 
   socket.on('room:state', (st) => {
     roomMeta = { ...roomMeta, ...st };
+    renderSessionVibeGuest();
     updateGuestRoomHint();
     renderVoteList();
     renderQueue();
@@ -921,6 +936,7 @@
         .map(t => t.id)
     );
     if (meta) roomMeta = { ...roomMeta, ...meta };
+    renderSessionVibeGuest();
     updateGuestRoomHint();
     renderQueue(); renderVoteList(); renderMyProposals();
     renderGuestTop3();
@@ -1072,6 +1088,15 @@
     }).join('');
   }
 
+  function renderSessionVibeGuest() {
+    const el = document.getElementById('sessionVibeGuest');
+    const sub = document.getElementById('sessionVibeGuestSub');
+    if (!el) return;
+    const vibe = (roomMeta && roomMeta.sessionVibe) ? String(roomMeta.sessionVibe) : 'Mix';
+    el.textContent = `Ambiance : ${vibe}`;
+    if (sub) sub.textContent = (roomMeta && roomMeta.sessionVibeSub) ? String(roomMeta.sessionVibeSub) : 'Basé sur les personnes présentes';
+  }
+
   function stringToColor(str) {
     let h = 0;
     for (let i = 0; i < str.length; i++) h = str.charCodeAt(i) + ((h<<5) - h);
@@ -1145,6 +1170,8 @@
     .then(r => r.json())
     .then(data => {
       queue = data.queue || [];
+      if (data.meta) roomMeta = { ...roomMeta, ...data.meta };
+      renderSessionVibeGuest();
       votedTracks = new Set(
         (queue || [])
           .filter(t => (t.likedBy || []).includes(guestId) || (t.skippedBy || []).includes(guestId))

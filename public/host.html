@@ -1041,6 +1041,10 @@
   <div class="tab-panel" id="panel-queue">
     <div class="section-title" style="display:flex;align-items:center;gap:7px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.6;flex-shrink:0"><rect x="3" y="4" width="18" height="2.5" rx="1.25"/><rect x="3" y="10.75" width="18" height="2.5" rx="1.25"/><rect x="3" y="17.5" width="12" height="2.5" rx="1.25"/></svg> File d'attente <span id="queueCount" style="color:var(--purple-light)"></span></div>
     <div class="queue-flow-tagline">La musique continue, sans coupure</div>
+    <div class="session-vibe-block">
+      <div id="sessionVibeHost" class="queue-flow-tagline">Ambiance : Mix</div>
+      <div id="sessionVibeHostSub" class="queue-flow-sub">Basé sur les personnes présentes</div>
+    </div>
     <div id="swipeVoteWrap" class="swipe-vote-wrap"></div>
     <div id="zpeedHostTop3" class="zpeed-top3-wrap" aria-live="polite"></div>
     <div id="queueList">
@@ -1228,9 +1232,19 @@
 <div id="reactionFeed"></div>
 
 <script>
+  function getOrCreatePersistentUserId() {
+    let uid = localStorage.getItem('zpeed_user_id');
+    if (!uid) {
+      uid = 'u_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+      localStorage.setItem('zpeed_user_id', uid);
+    }
+    return uid;
+  }
+
   const code       = localStorage.getItem('zpeed_code');
   const hostId     = localStorage.getItem('zpeed_hostId');
   const hostSecret   = localStorage.getItem('zpeed_hostSecret');
+  const userId = getOrCreatePersistentUserId();
   const qrDataUrl  = localStorage.getItem('zpeed_qr');
   const speakerNm  = localStorage.getItem('zpeed_hostName') || 'Session active';
 
@@ -1346,7 +1360,7 @@
   window._joinUrl = joinUrl;
 
   const socket = io();
-  function joinRoom() { socket.emit('host:join', { code, hostId, hostSecret }); }
+  function joinRoom() { socket.emit('host:join', { code, hostId, hostSecret, userId }); }
   socket.on('connect', joinRoom);
 
   let queue        = [];
@@ -2527,7 +2541,7 @@
   function hostAddTrack(track) {
     const hostName = localStorage.getItem('zpeed_hostName') || 'Host';
     const normalizedTrack = normalizeLiveTrack(track);
-    socket.emit('track:propose', { code, track: normalizedTrack || track, guestName: hostName, userName: hostName, hostId });
+    socket.emit('track:propose', { code, track: normalizedTrack || track, guestName: hostName, userName: hostName, hostId, userId });
     showToast(`✅ "${track.title}" ajouté`);
     _liveSearchSeq++;
     hideSuggestions();
@@ -2592,7 +2606,7 @@
   function playNow(track) {
     socket.emit('track:add_from_playlist', { code, track });
     setTimeout(() => {
-      if (queue.length > 0) socket.emit('track:play', { code, trackId: queue[queue.length-1].id });
+      if (queue.length > 0) socket.emit('track:play', { code, trackId: queue[queue.length-1].id, userId });
     }, 400);
   }
 
@@ -2879,6 +2893,7 @@
 
   socket.on('room:state', (st) => {
     roomMeta = { ...roomMeta, ...st };
+    renderSessionVibeHost();
     refreshSpotifyHostUi();
     renderQueue();
     renderHostTop3();
@@ -2897,6 +2912,7 @@
     guests = guestList || [];
     queue  = q || [];
     if (meta) roomMeta = { ...roomMeta, ...meta };
+    renderSessionVibeHost();
     hostVotedTracks = new Set((queue || []).filter(t => (t.voters || []).includes('host:' + hostId)).map(t => t.id));
     refreshSpotifyHostUi();
     renderQueue();
@@ -2918,6 +2934,7 @@
     });
     queue = q;
     if (meta) roomMeta = { ...roomMeta, ...meta };
+    renderSessionVibeHost();
     hostVotedTracks = new Set((queue || []).filter(t => (t.voters || []).includes('host:' + hostId)).map(t => t.id));
     refreshSpotifyHostUi();
     renderQueue();
@@ -3176,6 +3193,15 @@
     }).join('');
   }
 
+  function renderSessionVibeHost() {
+    const el = document.getElementById('sessionVibeHost');
+    const sub = document.getElementById('sessionVibeHostSub');
+    if (!el) return;
+    const vibe = (roomMeta && roomMeta.sessionVibe) ? String(roomMeta.sessionVibe) : 'Mix';
+    el.textContent = `Ambiance : ${vibe}`;
+    if (sub) sub.textContent = (roomMeta && roomMeta.sessionVibeSub) ? String(roomMeta.sessionVibeSub) : 'Basé sur les personnes présentes';
+  }
+
   let _swipeGesture = null;
 
   function applySwipeCardTransform(x, w) {
@@ -3189,7 +3215,7 @@
 
   function submitSwipeVote(trackId, direction) {
     if (!trackId || !direction) return;
-    socket.emit('track:swipe', { code, trackId, direction, hostId });
+    socket.emit('track:swipe', { code, trackId, direction, hostId, userId });
   }
 
   function finalizeSwipeGesture(deltaX) {
@@ -3345,7 +3371,7 @@
   // ─────────────────────────────────────────────
   // ACTIONS
   // ─────────────────────────────────────────────
-  function playTrack(id)  { socket.emit('track:play', { code, trackId: id }); }
+  function playTrack(id)  { socket.emit('track:play', { code, trackId: id, userId }); }
   function skipTrack(opts) {
     if (!opts || !opts.force) {
       if (hostAmBarTransportLocked()) return;
@@ -3429,6 +3455,7 @@
         roomMeta = { ...roomMeta, ...data.meta };
         hostVotedTracks = new Set((queue || []).filter(t => (t.voters || []).includes('host:' + hostId)).map(t => t.id));
       }
+      renderSessionVibeHost();
       refreshSpotifyHostUi();
       renderQueue();
       renderHostTop3();

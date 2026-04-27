@@ -28,8 +28,12 @@ const {
 } = require('./lib/roomPresence');
 const { tryAcceptSpotifyTracks, sortQueueForUi, metaForRoom } = require('./lib/queueAccept');
 const { tickSpotifyPipeline, initSpotifyPipelineState } = require('./lib/spotifyPipeline');
+const social = require('./lib/socialMusic');
 
 const SPOTIFY_PRECREATE_STATE = '__precreate__';
+const TASTE_FILE = path.join(__dirname, 'taste-profiles.json');
+const tasteProfiles = {};
+const TASTE_EMIT_INTERVAL = 4;
 
 /** Room codes are stored uppercase; OAuth state must match. Precreate flag is case-insensitive. */
 function resolveSessionKey(raw) {
@@ -41,6 +45,87 @@ function resolveSessionKey(raw) {
 
 function spotifyDiag(label, payload = {}) {
   console.log(`[SPOTIFY_DIAG] ${label}`, payload);
+}
+
+function loadTasteProfiles() {
+  try {
+    if (!fs.existsSync(TASTE_FILE)) return;
+    const raw = fs.readFileSync(TASTE_FILE, 'utf8');
+    const parsed = JSON.parse(raw);
+    for (const [uid, profile] of Object.entries(parsed || {})) {
+      tasteProfiles[uid] = social.migrateProfile({ ...profile, userId: uid });
+    }
+  } catch (e) {
+    console.warn('Could not load taste profiles:', e.message);
+  }
+}
+
+function saveTasteProfiles() {
+  try {
+    fs.writeFileSync(TASTE_FILE, JSON.stringify(tasteProfiles, null, 2));
+  } catch (e) {
+    console.warn('Could not save taste profiles:', e.message);
+  }
+}
+
+function ensureTasteProfile(userId) {
+  const uid = String(userId || '').trim();
+  if (!uid) return null;
+  if (!tasteProfiles[uid]) {
+    tasteProfiles[uid] = social.migrateProfile({
+      userId: uid,
+      genreCounts: social.emptyGenreCounts(),
+      likes: 0,
+      skips: 0,
+      playCompletion: 0,
+      topGenres: [],
+      interactions: [],
+      updatedAt: new Date().toISOString()
+    });
+  } else {
+    tasteProfiles[uid] = social.migrateProfile(tasteProfiles[uid]);
+  }
+  return tasteProfiles[uid];
+}
+
+/** Taste + group vibe; optional throttled room:state for clients that only listen there */
+function recordTasteUser(session, userId, track, action, trackId, io, code, { emitRoomState } = {}) {
+  const p = ensureTasteProfile(userId);
+  if (!p || !track) return;
+  social.applyTasteAction(p, track, action, trackId);
+  saveTasteProfiles();
+  if (action === 'like' || action === 'skip') {
+    social.recordSwipeOnWindow(session, trackId, social.mapTrackToGenre(track), action);
+  }
+  social.computeFullSessionVibe(session, tasteProfiles);
+  if (emitRoomState && io && code) {
+    session._tasteEventCount = (session._tasteEventCount || 0) + 1;
+    const vibeChanged = session.sessionVibe !== session._lastEmittedSessionVibe;
+    if (vibeChanged || session._tasteEventCount % TASTE_EMIT_INTERVAL === 0) {
+      session._lastEmittedSessionVibe = session.sessionVibe;
+      io.to(`session:${code}`).emit('room:state', { code, ...metaForRoom(session) });
+    }
+  }
+}
+
+function addActiveUser(sessionObj, userId) {
+  const uid = String(userId || '').trim();
+  if (!uid) return;
+  if (!sessionObj._activeUsers || typeof sessionObj._activeUsers !== 'object') sessionObj._activeUsers = {};
+  sessionObj._activeUsers[uid] = (sessionObj._activeUsers[uid] || 0) + 1;
+}
+
+function removeActiveUser(sessionObj, userId) {
+  const uid = String(userId || '').trim();
+  if (!uid || !sessionObj._activeUsers) return;
+  if (!sessionObj._activeUsers[uid]) return;
+  sessionObj._activeUsers[uid] -= 1;
+  if (sessionObj._activeUsers[uid] <= 0) delete sessionObj._activeUsers[uid];
+}
+
+function refreshSessionVibeOnly(sessionObj) {
+  social.computeFullSessionVibe(sessionObj, tasteProfiles);
+  return sessionObj.sessionVibe;
 }
 
 function spotifyApiFailure(res, status, stage, details = {}) {
@@ -116,10 +201,13 @@ function ensureTrackModel(track, session) {
   if (!track.spotifyUri && track.spotifyId) track.spotifyUri = `spotify:track:${track.spotifyId}`;
   if (!track.youtubeId && track.videoId) track.youtubeId = track.videoId;
   if (!track.proposedAt) track.proposedAt = new Date().toISOString();
+  if (!Array.isArray(track.genres)) track.genres = [];
   if (!Number.isFinite(track.likes)) track.likes = 0;
   if (!Number.isFinite(track.skips)) track.skips = 0;
   if (!Array.isArray(track.likedBy)) track.likedBy = [];
   if (!Array.isArray(track.skippedBy)) track.skippedBy = [];
+  if (!track.primaryGenre) track.primaryGenre = social.mapTrackToGenre(track);
+  if (track.autoDJ == null) track.autoDJ = false;
   return track;
 }
 
@@ -139,49 +227,73 @@ function rememberPlayedTrack(session, track) {
   }
 }
 
-function buildTrackFromSpotifyItem(item, session) {
-  return ensureTrackModel({
-    id: uuidv4(),
-    source: 'spotify',
-    platform: 'spotify',
-    spotifyId: item.id,
-    spotifyUri: item.uri,
-    youtubeId: null,
-    youtubeUrl: null,
+function buildTrackFromSpotifyItem(item, session, { autoDJ = false } = {}) {
+  const channel = Array.isArray(item.artists) ? item.artists.map(a => a.name).join(', ') : '';
+  const genres = Array.isArray(item.genres) ? item.genres : [];
+  const partial = {
     title: item.name,
-    channel: Array.isArray(item.artists) ? item.artists.map(a => a.name).join(', ') : '',
-    thumbnail: item.album?.images?.[0]?.url || '',
-    duration: `${Math.floor((item.duration_ms || 0) / 1000)}s`,
-    votes: -1,
-    proposedBy: 'SONDER AI',
-    voters: [],
-    voterNames: [],
-    aiSuggested: true,
-    proposedAt: new Date().toISOString()
-  }, session);
+    channel,
+    genres
+  };
+  return ensureTrackModel(
+    {
+      id: uuidv4(),
+      source: 'spotify',
+      platform: 'spotify',
+      spotifyId: item.id,
+      spotifyUri: item.uri,
+      youtubeId: null,
+      youtubeUrl: null,
+      title: item.name,
+      channel,
+      thumbnail: item.album?.images?.[0]?.url || '',
+      duration: `${Math.floor((item.duration_ms || 0) / 1000)}s`,
+      votes: -1,
+      proposedBy: 'SONDER AI',
+      voters: [],
+      voterNames: [],
+      aiSuggested: true,
+      autoDJ: !!autoDJ,
+      proposedAt: new Date().toISOString(),
+      genres,
+      primaryGenre: social.mapTrackToGenre(partial)
+    },
+    session
+  );
 }
 
-function buildTrackFromYoutubeItem(item, session) {
+function buildTrackFromYoutubeItem(item, session, { autoDJ = false } = {}) {
   const id = item.id || item.videoId;
-  return ensureTrackModel({
-    id: uuidv4(),
-    source: 'youtube',
-    platform: 'youtube',
-    spotifyUri: null,
-    youtubeId: id,
-    videoId: id,
-    youtubeUrl: `https://www.youtube.com/watch?v=${id}`,
+  const partial = {
     title: item.title,
     channel: item.channel?.name || item.channel || 'YouTube',
-    thumbnail: item.thumbnail?.url || `https://img.youtube.com/vi/${id}/mqdefault.jpg`,
-    duration: item.durationFormatted || '',
-    votes: -1,
-    proposedBy: 'SONDER AI',
-    voters: [],
-    voterNames: [],
-    aiSuggested: true,
-    proposedAt: new Date().toISOString()
-  }, session);
+    genres: []
+  };
+  return ensureTrackModel(
+    {
+      id: uuidv4(),
+      source: 'youtube',
+      platform: 'youtube',
+      spotifyUri: null,
+      youtubeId: id,
+      videoId: id,
+      youtubeUrl: `https://www.youtube.com/watch?v=${id}`,
+      title: item.title,
+      channel: partial.channel,
+      thumbnail: item.thumbnail?.url || `https://img.youtube.com/vi/${id}/mqdefault.jpg`,
+      duration: item.durationFormatted || '',
+      votes: -1,
+      proposedBy: 'SONDER AI',
+      voters: [],
+      voterNames: [],
+      aiSuggested: true,
+      autoDJ: !!autoDJ,
+      proposedAt: new Date().toISOString(),
+      genres: [],
+      primaryGenre: social.mapTrackToGenre(partial)
+    },
+    session
+  );
 }
 
 async function buildAiFallbackTracks(session, roomKey) {
@@ -190,9 +302,10 @@ async function buildAiFallbackTracks(session, roomKey) {
     (session.queue || []).map(t => t.spotifyUri || t.youtubeId || t.videoId || `${t.title}|${t.channel}`)
   );
   const history = Array.isArray(session.playHistory) ? session.playHistory.slice(-3).reverse() : [];
-  const seeds = history.length
-    ? history.map(h => `${h.title} ${h.channel}`.trim()).filter(Boolean)
-    : ['party music mix', 'dance pop essentials', 'feel good songs'];
+  const vibeSeeds = social.searchQueriesForVibe(session);
+  const historySeeds = history.map(h => `${h.title} ${h.channel}`.trim()).filter(Boolean);
+  const seeds = [...vibeSeeds, ...historySeeds];
+  if (!seeds.length) seeds.push('party music mix', 'dance pop essentials', 'feel good songs');
 
   if (session.hostSpotify?.tokens?.access_token) {
     const ensure = await ensureSpotifyAccessToken(session, process.env, { roomKey, stage: 'ai_fallback.spotify_search' });
@@ -207,7 +320,7 @@ async function buildAiFallbackTracks(session, roomKey) {
           const key = item.uri || item.id;
           if (!key || seen.has(key)) continue;
           seen.add(key);
-          results.push(buildTrackFromSpotifyItem(item, session));
+          results.push(buildTrackFromSpotifyItem(item, session, { autoDJ: true }));
           if (results.length >= 3) return results;
         }
       }
@@ -220,7 +333,7 @@ async function buildAiFallbackTracks(session, roomKey) {
       const key = item.id || item.videoId;
       if (!key || seen.has(key)) continue;
       seen.add(key);
-      results.push(buildTrackFromYoutubeItem(item, session));
+      results.push(buildTrackFromYoutubeItem(item, session, { autoDJ: true }));
       if (results.length >= 3) return results;
     }
   }
@@ -229,7 +342,7 @@ async function buildAiFallbackTracks(session, roomKey) {
     const key = item.videoId;
     if (seen.has(key)) continue;
     seen.add(key);
-    results.push(buildTrackFromYoutubeItem(item, session));
+    results.push(buildTrackFromYoutubeItem(item, session, { autoDJ: true }));
     if (results.length >= 3) return results;
   }
 
@@ -259,6 +372,8 @@ async function playNextAvailableTrack(session, roomKey, io, saveSessions, { from
   const next = session.queue.shift();
   if (session.currentTrack) rememberPlayedTrack(session, session.currentTrack);
   session.currentTrack = next;
+  const tasteUid = session.hostTasteUserId || `host:${session.hostId}`;
+  recordTasteUser(session, tasteUid, next, 'play', next.id, io, roomKey, { emitRoomState: true });
   saveSessions();
   io.to(`session:${roomKey}`).emit('track:playing', { track: next, fromServer });
   io.to(`session:${roomKey}`).emit('queue:update', { queue: session.queue, meta: metaForRoom(session) });
@@ -374,6 +489,13 @@ function hydrateSession(s) {
     s.nextCollectiveAfter = randomCollectiveInterval();
   }
   if (!s.collectiveMoment || typeof s.collectiveMoment !== 'object') s.collectiveMoment = null;
+  if (!s._activeUsers || typeof s._activeUsers !== 'object') s._activeUsers = {};
+  if (!Array.isArray(s._trackTasteWindow)) s._trackTasteWindow = [];
+  if (!Number.isFinite(s._tasteEventCount)) s._tasteEventCount = 0;
+  if (typeof s.hostTasteUserId !== 'string') s.hostTasteUserId = null;
+  if (!Array.isArray(s.sessionVibeGenres)) s.sessionVibeGenres = [];
+  if (typeof s.sessionVibe !== 'string' || !s.sessionVibe.trim()) s.sessionVibe = 'Mix';
+  refreshSessionVibeOnly(s);
 }
 
 function isHostSocketAuthorized(socket, code) {
@@ -1259,7 +1381,7 @@ function saveSessions() {
   try {
     const out = {};
     for (const [code, s] of Object.entries(sessions)) {
-      const { _presence, ...rest } = s;
+      const { _presence, _activeUsers, ...rest } = s;
       out[code] = rest;
     }
     fs.writeFileSync(SESSIONS_FILE, JSON.stringify(out, null, 2));
@@ -1272,6 +1394,7 @@ function saveSessions() {
 // IN-MEMORY DATA
 // ─────────────────────────────────────────────
 const sessions = {};
+loadTasteProfiles();
 loadSessions();
 
 // speakerSessions : speakerName → sessionCode
@@ -1654,14 +1777,19 @@ io.on('connection', (socket) => {
     return null;
   };
 
-  socket.on('host:join', ({ code, hostId, hostSecret }) => {
+  socket.on('host:join', ({ code, hostId, hostSecret, userId }) => {
     const s = sessions[code];
     if (!s || s.hostId !== hostId || s.hostSecret !== hostSecret) return;
     socket.join(`session:${code}`);
     socket.sessionCode = code;
     socket.role = 'host';
     socket.hostAuthorized = true;
+    socket.userId = userId || `host:${hostId}`;
+    socket.data.userId = socket.userId;
     addHostSocket(s, socket.id);
+    addActiveUser(s, socket.userId);
+    s.hostTasteUserId = socket.userId;
+    refreshSessionVibeOnly(s);
     saveSessions();
     io.to(`session:${code}`).emit('session:update', {
       guestCount: s.guestCount,
@@ -1689,14 +1817,10 @@ io.on('connection', (socket) => {
     if (!s || s.hostSecret !== hostSecret) return;
     s.playerLost = true;
     saveSessions();
-    io.to(`session:${code}`).emit('room:state', {
-      code,
-      spotifyNeedsDevice: !s.spotifyDeviceId,
-      playerLost: true
-    });
+    io.to(`session:${code}`).emit('room:state', { code, ...metaForRoom(s), playerLost: true });
   });
 
-  socket.on('guest:join', async ({ code, guestId, guestName }) => {
+  socket.on('guest:join', async ({ code, guestId, guestName, userId }) => {
     const s = sessions[code];
     if (!s) return;
     socket.join(`session:${code}`);
@@ -1704,9 +1828,13 @@ io.on('connection', (socket) => {
     socket.role = 'guest';
     socket.guestId = guestId;
     socket.guestName = guestName;
+    socket.userId = userId || guestId;
     socket.data.guestId = guestId;
+    socket.data.userId = socket.userId;
     socket.data.code = code;
     addGuestSocket(s, guestId, socket.id);
+    addActiveUser(s, socket.userId);
+    refreshSessionVibeOnly(s);
 
     io.to(`session:${code}`).emit('session:update', {
       guestCount: s.guestCount,
@@ -1722,7 +1850,7 @@ io.on('connection', (socket) => {
     await ensureQueueDepth(s, code, io, saveSessions, 2);
   });
 
-  socket.on('track:propose', async ({ code, guestId, hostId, guestName, userName, track }) => {
+  socket.on('track:propose', async ({ code, guestId, hostId, guestName, userName, track, userId }) => {
     const s = sessions[code];
     if (!s) return;
     const name = guestName || userName || 'Anonyme';
@@ -1738,10 +1866,21 @@ io.on('connection', (socket) => {
       voterNames: [name],
       status: 'pending',
       proposedAt: new Date().toISOString(),
-      platform: track.platform || (track.spotifyUri || track.spotifyId ? 'spotify' : 'youtube')
+      platform: track.platform || (track.spotifyUri || track.spotifyId ? 'spotify' : 'youtube'),
+      genres: Array.isArray(track.genres) ? track.genres : []
     }, s);
     s.queue.push(newTrack);
     sortQueueForUi(s);
+    recordTasteUser(
+      s,
+      userId || socket.userId || proposerKey,
+      newTrack,
+      'add',
+      trackId,
+      io,
+      code,
+      { emitRoomState: true }
+    );
     saveSessions();
     io.to(`session:${code}`).emit('queue:update', { queue: s.queue, meta: metaForRoom(s) });
     io.to(`session:${code}`).emit('notification', { message: `🎵 ${name} a proposé "${track.title}"` });
@@ -1774,7 +1913,7 @@ io.on('connection', (socket) => {
     return;
   });
 
-  socket.on('track:swipe', async ({ code, trackId, direction, guestId, guestName, userName, hostId }) => {
+  socket.on('track:swipe', async ({ code, trackId, direction, guestId, guestName, userName, hostId, userId }) => {
     const s = sessions[code];
     if (!s) return;
     const track = s.queue.find(t => t.id === trackId);
@@ -1797,6 +1936,16 @@ io.on('connection', (socket) => {
       return;
     }
 
+    recordTasteUser(
+      s,
+      userId || socket.userId || voterKey,
+      track,
+      direction,
+      trackId,
+      io,
+      code,
+      { emitRoomState: true }
+    );
     sortQueueForUi(s);
     tryAcceptSpotifyTracks(s, io, code, saveSessions);
     await ensureQueueDepth(s, code, io, saveSessions, 2);
@@ -1823,7 +1972,7 @@ io.on('connection', (socket) => {
     });
   });
 
-  socket.on('track:play', async ({ code, trackId }) => {
+  socket.on('track:play', async ({ code, trackId, userId }) => {
     if (!isHostSocketAuthorized(socket, code)) return;
     const s = sessions[code];
     if (!s) return;
@@ -1833,6 +1982,8 @@ io.on('connection', (socket) => {
     s.queue = s.queue.filter(t => t.id !== trackId);
     if (s.currentTrack) rememberPlayedTrack(s, s.currentTrack);
     s.currentTrack = ensureTrackModel(track, s);
+    const tasteUid = userId || socket.userId || s.hostTasteUserId || `host:${s.hostId}`;
+    recordTasteUser(s, tasteUid, s.currentTrack, 'play', s.currentTrack.id, io, code, { emitRoomState: true });
     saveSessions();
     io.to(`session:${code}`).emit('track:playing', { track: s.currentTrack, fromServer: false });
     io.to(`session:${code}`).emit('queue:update', { queue: s.queue, meta: metaForRoom(s) });
@@ -1881,10 +2032,14 @@ io.on('connection', (socket) => {
       voterNames: [],
       status: 'pending',
       proposedAt: new Date().toISOString(),
-      platform: track.platform || (track.spotifyUri || track.spotifyId ? 'spotify' : 'youtube')
+      platform: track.platform || (track.spotifyUri || track.spotifyId ? 'spotify' : 'youtube'),
+      genres: Array.isArray(track.genres) ? track.genres : []
     }, s);
     s.queue.push(newTrack);
     sortQueueForUi(s);
+    recordTasteUser(s, socket.userId || s.hostTasteUserId || `host:${s.hostId}`, newTrack, 'add', newTrack.id, io, code, {
+      emitRoomState: true
+    });
     saveSessions();
     io.to(`session:${code}`).emit('queue:update', { queue: s.queue, meta: metaForRoom(s) });
     io.to(`session:${code}`).emit('notification', { message: `🎧 Host a ajouté "${track.title}"` });
@@ -1902,6 +2057,8 @@ io.on('connection', (socket) => {
     } else if (socket.role === 'guest' && socket.guestId) {
       removeGuestSocket(s, socket.guestId, socket.id);
     }
+    removeActiveUser(s, socket.userId);
+    refreshSessionVibeOnly(s);
     tryAcceptSpotifyTracks(s, io, code, saveSessions);
     await ensureQueueDepth(s, code, io, saveSessions, 2);
     io.to(`session:${code}`).emit('room:state', { code, ...metaForRoom(s) });

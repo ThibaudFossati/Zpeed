@@ -1442,6 +1442,18 @@ body.zpeed-idle #queueList .queue-item.zpeed-nudge-target {
   color: rgba(255,255,255,0.62);
   letter-spacing: 0.01em;
 }
+.session-vibe-block {
+  margin: 2px 0 8px;
+}
+.session-vibe-block .queue-flow-tagline {
+  margin-bottom: 2px;
+}
+.queue-flow-sub {
+  font-size: 0.65rem;
+  color: rgba(255,255,255,0.45);
+  letter-spacing: 0.02em;
+  margin-bottom: 6px;
+}
 .swipe-vote-wrap {
   margin: 2px 0 12px;
   display: grid;
