@@ -3548,6 +3548,37 @@ body.sonder-host .host-card__lede {
   line-height: 1.35;
 }
 
+body.sonder-host #panel-queue .queue-invite-hint {
+  display: block;
+  width: 100%;
+  margin: -2px 0 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.44);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  line-height: 1.35;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+  align-self: flex-start;
+  max-width: 100%;
+}
+
+body.sonder-host #panel-queue .queue-invite-hint:hover,
+body.sonder-host #panel-queue .queue-invite-hint:focus-visible {
+  color: rgba(255, 255, 255, 0.62);
+  border-bottom-color: rgba(29, 185, 84, 0.35);
+  outline: none;
+}
+
 body.sonder-host .host-card__lede--tight {
   margin-bottom: 4px;
 }
@@ -3912,6 +3943,15 @@ body.sonder-host #panel-qr .host-card--qr-compact {
 body.sonder-host #panel-qr .qr-minimal--compact {
   gap: 12px;
   padding: 0;
+}
+
+/* Cohérent avec initLiveQR : 220–280px (scan fiable) */
+body.sonder-host #panel-qr #qrCanvas {
+  min-width: 220px;
+  min-height: 220px;
+  max-width: 280px;
+  max-height: 280px;
+  box-sizing: content-box;
 }
 
 body.sonder-host #panel-qr .qr-code-pill {

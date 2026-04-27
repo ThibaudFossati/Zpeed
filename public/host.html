@@ -1052,6 +1052,7 @@
           <span class="host-count-pill" id="queueCount" aria-live="polite"></span>
         </div>
         <p class="host-card__lede">La musique continue, sans coupure</p>
+        <button type="button" class="queue-invite-hint" id="queueInviteHint" hidden onclick="switchTab('guests')" aria-label="Ouvrir l’onglet Guests pour les suggestions d’invités">Suggestions d’invités disponibles</button>
         <div class="session-vibe-block host-card__vibe">
           <div id="sessionVibeHost" class="queue-flow-tagline host-vibe-line">Ambiance : Mix</div>
           <div id="sessionVibeHostSub" class="queue-flow-sub">Basé sur les personnes présentes</div>
@@ -1350,7 +1351,8 @@
     if (!canvas || !canvas.getContext) return;
     const ctx    = canvas.getContext('2d');
     const DPR    = Math.min(window.devicePixelRatio || 1, 2);
-    const CSS_W  = Math.min(228, Math.max(168, Math.floor(Math.min(420, window.innerWidth || 360) * 0.46)));
+    const vw = Math.min(window.innerWidth || 360, 560);
+    const CSS_W = Math.min(280, Math.max(220, Math.floor(vw * 0.48 + 50)));
     canvas.style.width  = CSS_W + 'px';
     canvas.style.height = CSS_W + 'px';
     canvas.width  = CSS_W * DPR;
@@ -3593,8 +3595,13 @@
 
   function renderMagicInviteHost() {
     const box = document.getElementById('magicInviteHost');
-    if (!box) return;
+    const hint = document.getElementById('queueInviteHint');
+    if (!box) {
+      if (hint) hint.hidden = true;
+      return;
+    }
     const sugRaw = roomMeta && Array.isArray(roomMeta.magicInviteSuggestions) ? roomMeta.magicInviteSuggestions : [];
+    if (hint) hint.hidden = !sugRaw.length;
     const sug = sugRaw.slice(0, 3);
     if (!sug.length) {
       box.style.display = 'none';
