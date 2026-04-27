@@ -164,11 +164,10 @@ body {
 }
 .sonder-host-chip-av {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
 }
 .sonder-host-chip-meta {
   display: flex;
@@ -192,6 +191,164 @@ body {
   text-overflow: ellipsis;
 }
 
+/* ═══ Avatar cards: flat “raised widget” frame, circular face (no shadow) ═══ */
+.avatar-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  /* Sits slightly above page chrome (not a flat black hole) */
+  background: rgba(16, 16, 22, 0.97);
+  box-shadow: none;
+}
+.avatar-card__img {
+  display: block;
+  border-radius: 50%;
+  object-fit: cover;
+  /* Keeps Avataaars / photos readable; frame carries depth */
+  background: rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+}
+.avatar-card__initial {
+  box-sizing: border-box;
+}
+.avatar-card--chip {
+  padding: 5px;
+  border-radius: 14px;
+}
+.avatar-card--chip .avatar-card__img {
+  width: 34px;
+  height: 34px;
+}
+.avatar-card--voter,
+.avatar-card--voter-initial {
+  width: 36px;
+  height: 36px;
+  padding: 4px;
+  border-radius: 12px;
+}
+.avatar-card--voter .avatar-card__img {
+  width: 28px;
+  height: 28px;
+}
+.avatar-card--voter-initial .avatar-card__initial {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.57rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.95);
+  flex-shrink: 0;
+}
+.avatar-card--contrib {
+  padding: 5px;
+  border-radius: 18px;
+}
+.avatar-card--contrib .avatar-card__img {
+  width: 60px;
+  height: 60px;
+}
+.avatar-card--guest {
+  padding: 7px;
+  border-radius: 20px;
+}
+.avatar-card--guest .avatar-card__img {
+  width: 54px;
+  height: 54px;
+}
+.avatar-card--sheet {
+  padding: 8px;
+  border-radius: 22px;
+  margin: 0 auto;
+}
+.avatar-card--sheet .avatar-card__img {
+  width: 96px;
+  height: 96px;
+}
+.avatar-card--profile-guest {
+  padding: 7px;
+  border-radius: 18px;
+}
+.avatar-card--profile-guest .avatar-card__img {
+  width: 66px;
+  height: 66px;
+}
+@media (max-width: 360px) {
+  .avatar-card--voter,
+  .avatar-card--voter-initial {
+    width: 32px;
+    height: 32px;
+    padding: 3px;
+  }
+  .avatar-card--voter .avatar-card__img {
+    width: 26px;
+    height: 26px;
+  }
+  .avatar-card--voter-initial .avatar-card__initial {
+    width: 26px;
+    height: 26px;
+    font-size: 0.52rem;
+  }
+  .voter-av-more {
+    width: 32px;
+    height: 32px;
+    font-size: 0.54rem;
+  }
+  .avatar-card--sheet {
+    padding: 6px;
+  }
+  .avatar-card--sheet .avatar-card__img {
+    width: min(88px, 28vw);
+    height: min(88px, 28vw);
+  }
+}
+@keyframes zpeedAvatarVoterIn {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+body.sonder-ui .avatar-card--voter,
+body.sonder-ui .avatar-card--voter-initial {
+  animation: zpeedAvatarVoterIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.voter-avatars {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+/* Matches .avatar-card--voter outer size on ≥361px; narrow screens override above */
+.voter-av-more {
+  width: 36px;
+  height: 36px;
+  box-sizing: border-box;
+  border-radius: 12px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: rgba(0, 212, 200, 0.92);
+  background: rgba(0, 24, 22, 0.9);
+  border: 1px solid rgba(0, 212, 200, 0.32);
+  box-shadow: none;
+}
 .sonder-profile-overlay {
   position: fixed;
   inset: 0;
@@ -250,13 +407,15 @@ body.sonder-profile-open {
   padding: 8px 8px 4px;
 }
 .sonder-profile-avatar {
-  width: 96px;
-  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
   margin: 0 auto 14px;
-  border-radius: 50%;
-  overflow: hidden;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
-  border: 2px solid rgba(167, 139, 250, 0.35);
+  min-height: 0;
+  border: none;
+  box-shadow: none;
+  background: none;
 }
 .sonder-profile-name {
   font-family: 'Roboto', sans-serif;
@@ -1560,11 +1719,13 @@ body.zpeed-idle #queueList .queue-item.zpeed-nudge-target {
   content: ''; flex: 1; height: 1px; background: var(--border);
 }
 
-/* ── GUEST ITEMS ── */
+/* ── GUEST ITEMS (legacy; prefer .avatar-card) ── */
 .guest-avatar {
   width: 44px; height: 44px; border-radius: 50%;
   flex-shrink: 0; overflow: hidden;
-  box-shadow: 0 3px 12px rgba(0,0,0,0.40), 0 0 0 1.5px rgba(255,255,255,0.10);
+  box-shadow: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(10, 10, 14, 0.6);
 }
 .guest-avatar img {
   width: 100%; height: 100%; display: block; border-radius: 50%;
@@ -2960,8 +3121,10 @@ body.sonder-guest .guest-propose #searchSection .section-title {
   }
 }
 
-body.sonder-ui .voter-av,
 body.sonder-ui .voter-av-more {
+  box-shadow: none !important;
+}
+body.sonder-ui .avatar-card {
   box-shadow: none !important;
 }
 
@@ -3358,12 +3521,8 @@ body.sonder-host #panel-platforms .src-contrib-hit {
   text-align: left;
 }
 
-body.sonder-host #panel-platforms .src-contrib-av {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
+body.sonder-host #panel-platforms .src-contrib-hit .avatar-card--contrib {
   flex-shrink: 0;
-  object-fit: cover;
 }
 
 body.sonder-host #panel-platforms .src-contrib-name {
@@ -3852,10 +4011,16 @@ body.sonder-host #panel-guests .guest-card {
 }
 
 body.sonder-host #panel-guests .guest-card__av {
-  width: 52px;
-  height: 52px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: auto;
   box-shadow: none;
-  border: 1px solid var(--border2);
+  border: none;
+  background: none;
+  padding: 0;
 }
 
 body.sonder-host #panel-guests .guest-card__body {
@@ -3991,4 +4156,428 @@ body.sonder-host .btn-ghost-danger {
 
 body.sonder-host .btn-ghost-danger:active {
   background: rgba(239, 68, 68, 0.08);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SONDER HOST — premium dark widget system (iOS / Nothing / visionOS)
+   Deep base, flat widget surfaces, warm→cool gradient accents on chrome only
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+body.sonder-ui.sonder-host {
+  --sonder-wg-radius: 32px;
+  --sonder-wg-radius-sm: 20px;
+  --sonder-surface: rgba(12, 12, 16, 0.94);
+  --sonder-surface-raised: rgba(20, 20, 26, 0.96);
+  --sonder-border: rgba(255, 255, 255, 0.09);
+  --sonder-text-strong: #f5f5f7;
+  --sonder-text-sub: rgba(255, 255, 255, 0.45);
+  --sonder-text-micro: rgba(255, 255, 255, 0.3);
+  --sonder-accent: linear-gradient(115deg, #fb923c 0%, #f472b6 38%, #a78bfa 72%, #38bdf8 100%);
+  --sonder-icon-stroke: 1.5px;
+  --radius-card: 32px;
+  --radius-xl: 34px;
+}
+
+/* Deep black + very soft radials (no “space” banding) */
+body.sonder-ui.sonder-host {
+  background-color: #020203;
+  background-image: radial-gradient(
+      ellipse 120% 70% at 50% -20%,
+      rgba(99, 102, 241, 0.14) 0%,
+      transparent 55%
+    ),
+    radial-gradient(ellipse 85% 55% at 100% 0%, rgba(244, 114, 182, 0.09) 0%, transparent 50%),
+    radial-gradient(ellipse 90% 50% at 0% 100%, rgba(56, 189, 248, 0.08) 0%, transparent 52%);
+  background-attachment: fixed;
+}
+
+body.sonder-ui.sonder-host .sonder-host-chip-av {
+  border: none;
+  background: none;
+  box-shadow: none;
+}
+
+body.sonder-ui.sonder-host .sonder-host-chip {
+  background: var(--sonder-surface);
+  border: 1px solid var(--sonder-border);
+  border-radius: var(--sonder-wg-radius-sm);
+  transition: transform 0.1s ease, border-color 0.12s, opacity 0.1s;
+}
+
+body.sonder-ui.sonder-host .sonder-host-chip:active {
+  transform: scale(0.98);
+  opacity: 0.95;
+}
+
+/* Nav = floating widget strip */
+body.sonder-ui.sonder-host .tab-bar {
+  background: var(--sonder-surface-raised);
+  border: 1px solid var(--sonder-border);
+  border-radius: var(--sonder-wg-radius);
+  box-shadow: none;
+  padding: 6px 8px;
+}
+
+body.sonder-ui.sonder-host .tab-btn {
+  transition: transform 0.1s cubic-bezier(0.25, 0.1, 0.25, 1), opacity 0.1s ease, color 0.1s, background 0.12s;
+  border: 1px solid transparent;
+  stroke-width: var(--sonder-icon-stroke);
+}
+
+body.sonder-ui.sonder-host .tab-btn:active {
+  transform: scale(0.98);
+  opacity: 0.9;
+}
+
+body.sonder-ui.sonder-host .tab-btn.active {
+  background: var(--sonder-accent);
+  color: #0a0a0c;
+  font-weight: 800;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* —— SOURCES: hero search = primary widget —— */
+body.sonder-ui.sonder-host #panel-platforms .search-wrap--host-hero {
+  padding: 24px 22px 20px;
+  border-radius: var(--sonder-wg-radius);
+  border: 1px solid var(--sonder-border);
+  background: var(--sonder-surface-raised);
+  margin-top: 4px;
+}
+
+body.sonder-ui.sonder-host .host-search-hero__input {
+  border-radius: var(--sonder-wg-radius-sm) !important;
+  background: rgba(0, 0, 0, 0.35) !important;
+  border: 1px solid var(--sonder-border) !important;
+  font-size: clamp(1.02rem, 3.2vw, 1.2rem) !important;
+  font-weight: 700 !important;
+}
+
+body.sonder-ui.sonder-host .host-search-hero__input:focus {
+  border-color: rgba(167, 139, 250, 0.45) !important;
+  background: rgba(0, 0, 0, 0.45) !important;
+  box-shadow: none !important;
+}
+
+body.sonder-ui.sonder-host .sources-search-hint--hero {
+  color: var(--sonder-text-sub);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+body.sonder-ui.sonder-host .host-search-live--hero.host-search-live--panel {
+  border-radius: var(--sonder-wg-radius-sm);
+  background: var(--sonder-surface);
+  border: 1px solid var(--sonder-border);
+}
+
+/* Widget grid: 2 columns on phone; 1 col on very narrow */
+body.sonder-ui.sonder-host #panel-platforms .sources-widgets-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+body.sonder-ui.sonder-host #panel-platforms .src-card--span2 {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 359px) {
+  body.sonder-ui.sonder-host #panel-platforms .sources-widgets-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Flat cards — no full-area gradients */
+body.sonder-ui.sonder-host #panel-platforms .src-card,
+body.sonder-ui.sonder-host .host-card {
+  border-radius: var(--sonder-wg-radius) !important;
+  border: 1px solid var(--sonder-border) !important;
+  background: var(--sonder-surface) !important;
+  box-shadow: none !important;
+  padding: 22px 24px 20px !important;
+}
+
+body.sonder-ui.sonder-host #panel-platforms .src-card--recent,
+body.sonder-ui.sonder-host #panel-platforms .src-card--trending,
+body.sonder-ui.sonder-host #panel-platforms .src-card--contrib,
+body.sonder-ui.sonder-host #panel-platforms .src-card--ai,
+body.sonder-ui.sonder-host #panel-platforms .src-card--quick,
+body.sonder-ui.sonder-host .host-card--queue-head,
+body.sonder-ui.sonder-host .host-card--swipe-primary,
+body.sonder-ui.sonder-host .host-card--queue-list,
+body.sonder-ui.sonder-host .host-card--live-hero,
+body.sonder-ui.sonder-host .host-card--live-vibe,
+body.sonder-ui.sonder-host .host-card--guests-head,
+body.sonder-ui.sonder-host .host-card--magic-invite,
+body.sonder-ui.sonder-host .host-card--guest-share,
+body.sonder-ui.sonder-host .host-card--qr-compact {
+  background: var(--sonder-surface) !important;
+  background-image: none !important;
+}
+
+body.sonder-ui.sonder-host .host-card--swipe-primary {
+  padding: 20px 20px 22px !important;
+}
+
+body.sonder-ui.sonder-host .host-card--queue-list {
+  padding: 14px 12px 16px !important;
+}
+
+body.sonder-ui.sonder-host .host-card--qr-compact {
+  padding: 24px 20px 22px !important;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+body.sonder-ui.sonder-host #panel-platforms .src-card__label {
+  font-size: 0.65rem !important;
+  letter-spacing: 0.14em !important;
+  font-weight: 800 !important;
+  text-transform: uppercase;
+  color: var(--sonder-text-micro) !important;
+}
+
+body.sonder-ui.sonder-host #panel-platforms .src-trend-title,
+body.sonder-ui.sonder-host #panel-platforms .src-ai-title {
+  font-size: 1.05rem !important;
+  font-weight: 800;
+  color: var(--sonder-text-strong);
+}
+
+body.sonder-ui.sonder-host #panel-platforms .src-card__sub {
+  font-size: 0.8125rem !important;
+  color: var(--sonder-text-sub) !important;
+  font-weight: 600;
+}
+
+/* Accent: gradient on key labels only */
+body.sonder-ui.sonder-host #panel-platforms .src-card--trending .src-card__label,
+body.sonder-ui.sonder-host #panel-platforms .src-card--ai .src-card__label,
+body.sonder-ui.sonder-host #panel-platforms .src-card--quick .src-card__label {
+  background: var(--sonder-accent);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* Fallback if clip unsupported */
+@supports not (background-clip: text) {
+  body.sonder-ui.sonder-host #panel-platforms .src-card--trending .src-card__label,
+  body.sonder-ui.sonder-host #panel-platforms .src-card--ai .src-card__label,
+  body.sonder-ui.sonder-host #panel-platforms .src-card--quick .src-card__label {
+    color: var(--sonder-text-strong);
+    -webkit-text-fill-color: var(--sonder-text-strong);
+  }
+}
+
+body.sonder-ui.sonder-host .host-card__title {
+  font-size: clamp(1.15rem, 3.2vw, 1.4rem) !important;
+  font-weight: 800;
+  color: var(--sonder-text-strong) !important;
+  letter-spacing: -0.02em;
+}
+
+body.sonder-ui.sonder-host .host-card__lede,
+body.sonder-ui.sonder-host .host-vibe-line {
+  font-size: 0.875rem !important;
+  font-weight: 600;
+  color: var(--sonder-text-sub) !important;
+}
+
+body.sonder-ui.sonder-host .host-card__micro,
+body.sonder-ui.sonder-host .queue-flow-sub {
+  font-size: 0.75rem !important;
+  color: var(--sonder-text-micro) !important;
+  font-weight: 500;
+}
+
+body.sonder-ui.sonder-host .host-count-pill {
+  background: var(--sonder-accent) !important;
+  color: #0a0a0c !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 12px;
+  min-height: 38px;
+  font-size: 0.88rem;
+}
+
+/* Queue rows + list */
+body.sonder-ui.sonder-host #queueList .queue-item.track-card,
+body.sonder-ui.sonder-host #hostSearchResults .search-result,
+body.sonder-ui.sonder-host #hostSearchResults .host-result {
+  border-radius: var(--sonder-wg-radius-sm) !important;
+  background: var(--sonder-surface-raised) !important;
+  border: 1px solid var(--sonder-border) !important;
+  box-shadow: none !important;
+}
+
+body.sonder-ui.sonder-host
+  #queueList
+  .queue-item.track-card.zpeed-heat-blaze,
+body.sonder-ui.sonder-host
+  #queueList
+  .queue-item.track-card.zpeed-heat-high,
+body.sonder-ui.sonder-host
+  #queueList
+  .queue-item.track-card.zpeed-heat-med {
+  box-shadow: none !important;
+}
+
+/* Swipe primary card */
+body.sonder-ui.sonder-host #panel-queue .swipe-vote-card--host-xl {
+  border-radius: var(--sonder-wg-radius) !important;
+  background: rgba(0, 0, 0, 0.28) !important;
+  border: 1px solid var(--sonder-border) !important;
+}
+
+/* Live: large rounded art (not circle), calmer */
+body.sonder-ui.sonder-host .live-hero--object .live-hero__art,
+body.sonder-ui.sonder-host .live-hero__art {
+  width: min(80vw, 300px) !important;
+  height: min(80vw, 300px) !important;
+  max-width: 100%;
+  border-radius: var(--sonder-wg-radius) !important;
+  object-fit: cover;
+  box-shadow: none;
+  border: 1px solid var(--sonder-border);
+  background: var(--sonder-surface-raised);
+}
+
+body.sonder-ui.sonder-host .live-hero--object .live-hero__title,
+body.sonder-ui.sonder-host .live-hero__title {
+  color: var(--sonder-text-strong) !important;
+  font-size: clamp(1.4rem, 4.2vw, 1.6rem) !important;
+  font-weight: 800;
+}
+
+body.sonder-ui.sonder-host .live-hero--object .live-hero__artist,
+body.sonder-ui.sonder-host .live-hero__artist {
+  font-size: 0.9rem !important;
+  color: var(--sonder-text-sub) !important;
+  font-weight: 600;
+}
+
+body.sonder-ui.sonder-host .live-source-chip {
+  color: var(--sonder-text-sub) !important;
+  border: 1px solid var(--sonder-border) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  font-weight: 600;
+  font-size: 0.75rem !important;
+}
+
+body.sonder-ui.sonder-host .live-panel-cta,
+body.sonder-ui.sonder-host .am-activate-btn {
+  background: var(--sonder-accent) !important;
+  color: #0a0a0c !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  font-weight: 800 !important;
+  border-radius: var(--sonder-wg-radius-sm) !important;
+  transition: transform 0.1s ease, opacity 0.1s !important;
+  box-shadow: none !important;
+}
+
+body.sonder-ui.sonder-host .live-panel-cta:active,
+body.sonder-ui.sonder-host .am-activate-btn:active {
+  transform: scale(0.98);
+  opacity: 0.9;
+}
+
+body.sonder-ui.sonder-host .am-bar {
+  background: var(--sonder-surface-raised) !important;
+  border: 1px solid var(--sonder-border) !important;
+  border-radius: var(--sonder-wg-radius) !important;
+  box-shadow: none !important;
+}
+
+body.sonder-ui.sonder-host .am-track-pill {
+  background: var(--sonder-surface) !important;
+  border: 1px solid var(--sonder-border) !important;
+  border-radius: var(--sonder-wg-radius-sm) !important;
+  box-shadow: none !important;
+}
+
+/* Guests: profile stat line */
+body.sonder-ui.sonder-host #panel-guests .guest-card__vibe {
+  color: var(--sonder-text-sub) !important;
+  font-size: 0.75rem !important;
+  font-weight: 600;
+}
+
+body.sonder-ui.sonder-host .btn--host-compact.btn-primary,
+body.sonder-ui.sonder-host .btn.btn-primary,
+body.sonder-ui.sonder-host .btn--qr-primary {
+  background: var(--sonder-accent) !important;
+  color: #0a0a0c !important;
+  font-weight: 800 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: none !important;
+  border-radius: var(--sonder-wg-radius-sm) !important;
+}
+
+body.sonder-ui.sonder-host .btn--host-compact.btn-primary:active,
+body.sonder-ui.sonder-host .btn.btn-primary:active {
+  transform: scale(0.98);
+  opacity: 0.9;
+}
+
+body.sonder-ui.sonder-host .sugg-add-chip {
+  border: 1px solid var(--sonder-border) !important;
+  background: var(--sonder-surface) !important;
+  border-radius: 14px !important;
+  font-size: 1.25rem !important;
+  font-weight: 700;
+  color: #fff;
+}
+
+body.sonder-ui.sonder-host .sugg-add-chip:active {
+  transform: scale(0.95);
+  opacity: 0.9;
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Search “added” — border pulse, not glow */
+@keyframes sonder-wg-search-pulse {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: inset 0 0 0 2px rgba(167, 139, 250, 0.4);
+  }
+}
+
+body.sonder-ui.sonder-host .search-wrap--host-hero.host-search--just-added {
+  animation: sonder-wg-search-pulse 0.6s ease;
+}
+
+/* ── Avatars: SONDER host — same “raised widget” language as tab bar / cards ── */
+body.sonder-ui.sonder-host .avatar-card {
+  border-color: var(--sonder-border);
+  background: var(--sonder-surface-raised);
+}
+body.sonder-ui.sonder-host .voter-av-more {
+  border-color: var(--sonder-border);
+  color: var(--sonder-text-sub);
+  background: var(--sonder-surface-raised);
+}
+body.sonder-ui.sonder-guest .avatar-card {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(22, 22, 30, 0.98);
+}
+
+body.sonder-guest .guest-profil-avatar-wrap {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: auto;
+  padding: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
 }
