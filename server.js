@@ -13,7 +13,13 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
-const { ensureSpotifyAccessToken, applyTokenExpiry } = require('./lib/spotifySession');
+const {
+  ensureSpotifyAccessToken,
+  applyTokenExpiry,
+  transferPlayback,
+  startPlayUris,
+  getPlaybackState
+} = require('./lib/spotifySession');
 const {
   addHostSocket,
   removeHostSocket,
@@ -629,6 +635,116 @@ app.get('/api/spotify/token', async (req, res) => {
     profile: s.hostSpotify.profile || null,
     use_mock_spotify: useMockSpotify()
   });
+});
+
+app.post('/api/spotify/activate-sound', async (req, res) => {
+  const { code, secret, deviceId, trackUri } = req.body || {};
+  const roomKey = resolveSessionKey(code);
+  const s = sessions[roomKey];
+  if (!s) {
+    return res.status(404).json({ ok: false, message: 'Session introuvable.' });
+  }
+  if (!secret || s.hostSecret !== secret) {
+    return res.status(403).json({ ok: false, message: 'Action non autorisée.' });
+  }
+  if (useMockSpotify()) {
+    return res.status(200).json({
+      ok: false,
+      demoMode: true,
+      message: 'Mode démo : recherche et file actives, son via Spotify requis'
+    });
+  }
+  if (!s.hostSpotify?.tokens?.access_token) {
+    return res.status(401).json({
+      ok: false,
+      message: 'Connecte Spotify pour activer le son.'
+    });
+  }
+
+  const ensure = await ensureSpotifyAccessToken(s, process.env, { roomKey, stage: 'activate_sound.ensure_token' });
+  if (!ensure.ok) {
+    if ((ensure.status || 0) === 429) {
+      return res.status(200).json({
+        ok: false,
+        demoMode: true,
+        message: 'Mode démo : recherche et file actives, son via Spotify requis'
+      });
+    }
+    return res.status(200).json({
+      ok: false,
+      message: 'Impossible d’activer le son automatiquement. Ouvre Spotify une fois, puis choisis SONDER — instories.'
+    });
+  }
+  if (ensure.refreshed) saveSessions();
+
+  const selectedDeviceId = String(deviceId || s.spotifyDeviceId || '').trim();
+  if (!selectedDeviceId) {
+    return res.status(200).json({
+      ok: false,
+      message: 'Impossible d’activer le son automatiquement. Ouvre Spotify une fois, puis choisis SONDER — instories.'
+    });
+  }
+
+  let selectedTrackUri = String(trackUri || '').trim();
+  if (!selectedTrackUri && s.currentTrack) {
+    selectedTrackUri = s.currentTrack.spotifyUri || (s.currentTrack.spotifyId ? `spotify:track:${s.currentTrack.spotifyId}` : '');
+  }
+  if (!selectedTrackUri) {
+    const firstSpotifyTrack = (s.queue || []).find(t => t.spotifyUri || t.spotifyId);
+    if (firstSpotifyTrack) {
+      selectedTrackUri = firstSpotifyTrack.spotifyUri || `spotify:track:${firstSpotifyTrack.spotifyId}`;
+    }
+  }
+
+  try {
+    const transferRes = await transferPlayback(s, [selectedDeviceId]);
+    if (transferRes.status === 429 || transferRes.status === 403 || transferRes.status === 404) {
+      return res.status(200).json({
+        ok: false,
+        demoMode: true,
+        message: 'Mode démo : recherche et file actives, son via Spotify requis'
+      });
+    }
+    if (transferRes.status < 200 || transferRes.status >= 300) {
+      return res.status(200).json({
+        ok: false,
+        message: 'Impossible d’activer le son automatiquement. Ouvre Spotify une fois, puis choisis SONDER — instories.'
+      });
+    }
+
+    if (selectedTrackUri) {
+      const playRes = await startPlayUris(s, selectedDeviceId, [selectedTrackUri]);
+      if (![200, 202, 204].includes(playRes.status)) {
+        if (playRes.status === 429 || playRes.status === 403 || playRes.status === 404) {
+          return res.status(200).json({
+            ok: false,
+            demoMode: true,
+            message: 'Mode démo : recherche et file actives, son via Spotify requis'
+          });
+        }
+        return res.status(200).json({
+          ok: false,
+          message: 'Impossible d’activer le son automatiquement. Ouvre Spotify une fois, puis choisis SONDER — instories.'
+        });
+      }
+    }
+
+    const playback = await getPlaybackState(s);
+    s.spotifyDeviceId = selectedDeviceId;
+    s.playerLost = false;
+    saveSessions();
+    io.to(`session:${roomKey}`).emit('room:state', { code: roomKey, ...metaForRoom(s) });
+    return res.json({
+      ok: true,
+      playback: playback || null,
+      activeDeviceId: selectedDeviceId
+    });
+  } catch (e) {
+    return res.status(200).json({
+      ok: false,
+      message: 'Impossible d’activer le son automatiquement. Ouvre Spotify une fois, puis choisis SONDER — instories.'
+    });
+  }
 });
 
 app.get('/api/spotify/playlists', async (req, res) => {

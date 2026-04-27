@@ -1094,7 +1094,7 @@
   <!-- ═══ APPLE MUSIC PLAYER BAR ═══ -->
   <div class="am-bar" id="amBar">
     <div class="am-playback-hint" id="amPlaybackHint" hidden></div>
-    <button type="button" class="am-activate-btn" id="amActivateMusicBtn" onclick="activateSpotifyMusicOneTap()" hidden>Activer la musique</button>
+    <button type="button" class="am-activate-btn" id="amActivateMusicBtn" onclick="activateSound()" hidden>Activer le son</button>
     <img class="am-artwork" id="amThumb" src="" alt="Artwork en cours" onerror="this.onerror=null;if(typeof THUMB_FALLBACK!=='undefined')this.src=THUMB_FALLBACK">
     <div class="am-track-meta">
       <div class="am-track-title" id="amTitle">—</div>
@@ -1560,7 +1560,7 @@
       return;
     }
     btn.disabled = false;
-    btn.textContent = 'Activer la musique';
+    btn.textContent = 'Activer le son';
   }
 
   async function waitForSpotifyDeviceReady(timeoutMs) {
@@ -1598,10 +1598,64 @@
     }
   }
 
-  async function activateSpotifyMusicOneTap() {
+  async function fetchCurrentSpotifyPlaybackState() {
+    if (!window._spotifyToken || window._spotifyMockMode) return null;
+    const res = await fetch('https://api.spotify.com/v1/me/player', {
+      headers: { 'Authorization': `Bearer ${window._spotifyToken}` }
+    }).catch(() => null);
+    if (!res) return null;
+    if (res.status === 429) {
+      markSpotifyUnavailable('Mode démo : recherche et file actives, son via Spotify requis');
+      return null;
+    }
+    if (res.status === 204) return null;
+    if (res.status !== 200) return null;
+    return res.json().catch(() => null);
+  }
+
+  function applySpotifyPlaybackStateToUi(state) {
+    if (!state || !state.item) return;
+    const currentUri = state.item.uri || null;
+    if (currentUri && currentTrack?.spotifyUri && currentTrack.spotifyUri !== currentUri) {
+      const fromQueue = queue.find(t => t.spotifyUri === currentUri || (t.spotifyId && `spotify:track:${t.spotifyId}` === currentUri));
+      if (fromQueue) currentTrack = fromQueue;
+    }
+    if (state.item.name) {
+      const titleEl = document.getElementById('amTitle');
+      if (titleEl) titleEl.textContent = state.item.name;
+    }
+    if (Array.isArray(state.item.artists)) {
+      const artistEl = document.getElementById('amArtist');
+      if (artistEl) artistEl.textContent = state.item.artists.map(a => a.name).join(', ');
+    }
+    if (state.item.album?.images?.[0]?.url) {
+      const thumb = document.getElementById('amThumb');
+      if (thumb) thumb.src = state.item.album.images[0].url;
+    }
+    const icon = document.getElementById('amPlayIcon');
+    if (icon) {
+      if (state.is_playing) icon.innerHTML = '<rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/>';
+      else icon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
+    }
+    const progressFill = document.getElementById('amProgressFill');
+    const progressWrap = document.getElementById('amProgress');
+    if (progressFill && progressWrap && Number.isFinite(state.progress_ms) && Number.isFinite(state.item.duration_ms) && state.item.duration_ms > 0) {
+      progressWrap.hidden = false;
+      progressFill.style.width = Math.max(0, Math.min(100, (state.progress_ms / state.item.duration_ms) * 100)) + '%';
+    }
+    refreshSpotifyHostUi();
+  }
+
+  async function syncSpotifyPlaybackUi() {
+    const state = await fetchCurrentSpotifyPlaybackState();
+    if (state) applySpotifyPlaybackStateToUi(state);
+    return state;
+  }
+
+  async function activateSound() {
     const st = getHostPlaybackUiState();
     if (st === 'mock') {
-      showToast('Mode test : lecture Spotify désactivée.');
+      showToast('Mode démo : recherche et file actives, son via Spotify requis');
       return;
     }
     if (st === 'no_spotify') {
@@ -1611,29 +1665,53 @@
     spotifyActivationUiPending(true);
     try {
       if (!window._spotifyToken) {
-        showToast('Connecte Spotify pour activer la musique.');
+        showToast('Connecte Spotify pour activer le son.');
         return;
       }
       if (!hostSpotifyPlaybackDeviceReady()) {
         await initSpotifySDK();
         const ok = await waitForSpotifyDeviceReady(2600);
         if (!ok) {
-          showToast('Si ça ne fonctionne pas, ouvre Spotify une fois.');
+          showToast('Impossible d’activer le son automatiquement. Ouvre Spotify une fois, puis choisis SONDER — instories.');
           openAmDeviceHelp('setup');
           return;
         }
       }
-      const moved = await transferPlaybackToHostDevice(false);
-      if (!moved) {
-        showToast('Si ça ne fonctionne pas, ouvre Spotify une fois.');
+      let fallbackTrack = currentTrack?.spotifyUri || null;
+      if (!fallbackTrack && currentTrack?.spotifyId) fallbackTrack = `spotify:track:${currentTrack.spotifyId}`;
+      if (!fallbackTrack) {
+        const queuedSpotify = queue.find(t => t.spotifyUri || t.spotifyId);
+        if (queuedSpotify) fallbackTrack = queuedSpotify.spotifyUri || `spotify:track:${queuedSpotify.spotifyId}`;
+      }
+      const payload = {
+        code,
+        secret: hostSecret,
+        deviceId: window._spotifyDeviceId,
+        trackUri: fallbackTrack
+      };
+      const res = await fetch('/api/spotify/activate-sound', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(payload)
+      }).catch(() => null);
+      if (!res) {
+        showToast('Impossible d’activer le son automatiquement. Ouvre Spotify une fois, puis choisis SONDER — instories.');
         return;
       }
-      if (currentTrack?.spotifyUri) {
-        await playSpotifyTrack(currentTrack.spotifyUri);
-        showToast('Musique activée');
-      } else {
-        showToast('Lecture activée. Ajoute un titre Spotify pour démarrer.');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        if (data?.demoMode) {
+          markSpotifyUnavailable('Mode démo : recherche et file actives, son via Spotify requis');
+          showToast('Mode démo : recherche et file actives, son via Spotify requis');
+        } else {
+          showToast('Impossible d’activer le son automatiquement. Ouvre Spotify une fois, puis choisis SONDER — instories.');
+        }
+        return;
       }
+      if (data.playback) applySpotifyPlaybackStateToUi(data.playback);
+      await syncSpotifyPlaybackUi();
+      showToast('SONDER contrôle Spotify');
     } finally {
       spotifyActivationUiPending(false);
       refreshSpotifyHostUi();
@@ -1653,7 +1731,7 @@
     if (amBar) amBar.classList.toggle('am-bar--simple', isSimple);
     if (activateBtn) {
       activateBtn.hidden = !(st === 'needs_device' || st === 'no_spotify');
-      activateBtn.textContent = st === 'no_spotify' ? 'Connecter Spotify' : 'Activer la musique';
+      activateBtn.textContent = st === 'no_spotify' ? 'Connecter Spotify' : 'Activer le son';
       activateBtn.disabled = false;
     }
     if (statusLine) {
@@ -1665,7 +1743,7 @@
     }
     if (stateHelper) {
       if (st === 'needs_device') {
-        stateHelper.textContent = 'Ouvre Spotify puis choisis SONDER comme appareil.';
+        stateHelper.textContent = 'SONDER va prendre le contrôle de Spotify pour lancer la musique.';
       } else if (st === 'mock') {
         stateHelper.textContent = 'Recherche et file actives, lecture désactivée.';
       } else if (st === 'rate_limited') {
@@ -2610,6 +2688,7 @@
       showToast('Session Spotify expirée ou accès refusé — reconnecte-toi.');
       return;
     }
+    setTimeout(() => { syncSpotifyPlaybackUi().catch(() => {}); }, 350);
   }
 
   // ─────────────────────────────────────────────
@@ -3116,6 +3195,9 @@
       if (hostAmBarTransportLocked()) return;
     }
     socket.emit('track:skip', { code });
+    if (!opts || !opts.force) {
+      setTimeout(() => { syncSpotifyPlaybackUi().catch(() => {}); }, 700);
+    }
   }
 
   function confirmEndSession() {
@@ -3311,6 +3393,7 @@
       try {
         await window._spotifyPlayer.togglePlay();
         console.log('[spotify] togglePlay fired');
+        setTimeout(() => { syncSpotifyPlaybackUi().catch(() => {}); }, 350);
       } catch (e) {
         console.warn('[spotify] togglePlay failed:', e.message);
         showToast('Lecture Spotify impossible — vérifie l’appareil.');
