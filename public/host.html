@@ -1040,6 +1040,7 @@
   <!-- ═══ PANEL : QUEUE ═══ -->
   <div class="tab-panel" id="panel-queue">
     <div class="section-title" style="display:flex;align-items:center;gap:7px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.6;flex-shrink:0"><rect x="3" y="4" width="18" height="2.5" rx="1.25"/><rect x="3" y="10.75" width="18" height="2.5" rx="1.25"/><rect x="3" y="17.5" width="12" height="2.5" rx="1.25"/></svg> File d'attente <span id="queueCount" style="color:var(--purple-light)"></span></div>
+    <div class="queue-flow-tagline">La meilleure musique du groupe joue, en continu</div>
     <div id="zpeedHostTop3" class="zpeed-top3-wrap" aria-live="polite"></div>
     <div id="queueList">
       <div class="empty">
@@ -2979,34 +2980,7 @@
   });
 
   // ── Vote d'un guest → pulse Observatory node + feedback visuel ──
-  socket.on('track:voted', ({ voterName, trackId }) => {
-    const myName = localStorage.getItem('zpeed_hostName') || 'Host';
-    if (voterName === myName) return;
-    addReactionPill(voterName, '👍');
-    const vc = document.querySelector(`#queueList .queue-item[data-track-id="${trackId}"] .vote-count`);
-    if (vc) {
-      vc.classList.add('zpeed-pop');
-      setTimeout(() => vc.classList.remove('zpeed-pop'), 300);
-    }
-    // Pulse the track node in the Observatory
-    if (window.obs) {
-      window.obs.pulse(trackId);
-      // Update importance after a short delay (let server re-send queue)
-      setTimeout(() => {
-        const t = queue.find(q => q.id === trackId);
-        if (t && window.obs) {
-          window.obs.set(t.id, {
-            type:       'track',
-            title:      t.title,
-            sub:        t.channel || '',
-            thumb:      t.thumbnail || '',
-            color:      '#4facfe',
-            importance: Math.max(1, (t.votes || 0) + 1)
-          });
-        }
-      }, 200);
-    }
-  });
+  socket.on('track:voted', () => {});
 
   function spawnHostEmoji(emoji, count = 5) {
     const rain = document.getElementById('emojiRainHost');
@@ -3137,30 +3111,6 @@
     setTimeout(() => bubble.remove(), 1200);
   }
 
-  function hostVote(trackId, value, btn) {
-    if (hostVotedTracks.has(trackId)) return;
-    hostVotedTracks.add(trackId);
-    const hostName = localStorage.getItem('zpeed_hostName') || 'Host';
-    socket.emit('track:vote', {
-      code,
-      trackId,
-      hostId,
-      guestName: hostName,
-      userName: hostName,
-      vote: value
-    });
-    if (btn) {
-      btn.classList.add('btn-vote--pop');
-      setTimeout(() => btn.classList.remove('btn-vote--pop'), 280);
-      const row = document.querySelector(`#queueList .queue-item[data-track-id="${trackId}"] .vote-count`);
-      if (row) {
-        row.classList.add('zpeed-pop');
-        setTimeout(() => row.classList.remove('zpeed-pop'), 300);
-      }
-      btn.disabled = true; btn.style.opacity = '0.45';
-    }
-  }
-
   function renderQueue() {
     const el = document.getElementById('queueList');
     document.getElementById('queueCount').textContent = queue.length ? `(${queue.length})` : '';
@@ -3168,40 +3118,29 @@
       el.innerHTML = `<div class="empty"><div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div><div class="empty-text">File vide...</div></div>`;
       return;
     }
-    const th = roomMeta.voteThreshold != null ? roomMeta.voteThreshold : 2;
-    const thNum = roomMeta.voteThreshold != null ? Number(roomMeta.voteThreshold) : NaN;
-    const hostVoterKey = 'host:' + hostId;
     el.innerHTML = queue.map((t, i) => {
       const safeTr = JSON.stringify(t).replace(/"/g, '&quot;');
       const voterList = t.voterNames || [];
       const voters = voterList.slice(0, 4).map(n =>
         `<img class="voter-av" src="${avatarUrl(n, 52)}" alt="${n}" title="${n}">`
       ).join('') + (voterList.length > 4 ? `<div class="voter-av-more">+${voterList.length - 4}</div>` : '');
-      const heatIcon = t.votes >= 7 ? ' 🔥' : t.votes >= 4 ? ' ⚡' : '';
-      const st = t.status === 'accepted' ? '✓ Validé' : t.status === 'spotify_queued' ? 'Spotify' : t.status === 'pending' ? `Seuil ${th}` : '';
-      const votedByHost = (t.voters || []).includes(hostVoterKey);
-      const canHostVote = t.status === 'pending' && !votedByHost;
-      const voteBtns = canHostVote
-        ? `<div class="host-queue-votes" style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><button type="button" class="btn-vote" onclick="event.stopPropagation();hostVote('${t.id}',1,this)">👍</button><button type="button" class="btn-vote" onclick="event.stopPropagation();hostVote('${t.id}',-1,this)">👎</button></div>`
-        : '';
       const stKey = t.status || 'pending';
       const stClass = 'status-' + stKey;
-      const v = t.votes | 0;
-      const heatTier = !Number.isNaN(thNum) ? zpeedHeatTierHost(v, thNum) : 'zpeed-heat-low';
+      const heatTier = 'zpeed-heat-low';
       const isPlayingNow = currentTrack && t.id === currentTrack.id;
-      const isValidated = t.status === 'accepted' || t.status === 'spotify_queued' || (!Number.isNaN(thNum) && v >= thNum);
+      const stateBadge = '<span class="queue-diff-badge queue-diff-badge--waiting">En attente</span>';
+      const aiBadge = t.aiSuggested
+        ? '<span class="queue-diff-badge queue-diff-badge--ai">Auto-DJ</span>'
+        : '';
+      const diffBadges = `<div class="queue-diff-badges">${stateBadge}${aiBadge}</div>`;
       const voteLabel = isPlayingNow
         ? 'En lecture'
-        : isValidated
-          ? 'Validé · prêt à jouer'
-          : !Number.isNaN(thNum)
-            ? `👍 ${Math.max(0, v)} / ${thNum} votes`
-            : `👍 ${Math.max(0, v)} votes`;
+        : t.aiSuggested
+          ? 'Lecture continue auto'
+          : 'Prêt à jouer';
       const voteLabelClass = isPlayingNow
         ? 'queue-vote-status queue-vote-status--playing'
-        : isValidated
-          ? 'queue-vote-status queue-vote-status--ready'
-          : 'queue-vote-status queue-vote-status--pending';
+        : 'queue-vote-status queue-vote-status--pending';
       return `
         <div class="queue-item track-card ${stClass} ${heatTier}" id="qrow-${t.id}" data-track-id="${t.id || ''}">
           <div class="zpeed-react-layer" aria-hidden="true"></div>
@@ -3210,15 +3149,14 @@
           <img class="queue-thumb" src="${t.thumbnail||''}" onerror="this.onerror=null;this.src=THUMB_FALLBACK" alt="">
           <div class="queue-info" style="flex:1;min-width:0">
             <div class="queue-title">${t.title}</div>
-            <div class="queue-meta">${t.channel}${st ? ` · <span style="color:var(--purple-light);font-weight:600">${st}</span>` : ''}</div>
+            <div class="queue-meta">${t.channel || ''}</div>
             <div class="queue-proposer">${t.proposedBy === '🎧 Host' ? '🎧 Host' : '🎤 ' + t.proposedBy}</div>
+            ${diffBadges}
             <div class="${voteLabelClass}">${voteLabel}</div>
             ${voters ? `<div class="voter-avatars">${voters}</div>` : ''}
-            ${voteBtns}
           </div>
           <div class="queue-item--actions">
             <button type="button" class="sugg-related-btn queue-related-btn" onclick="event.stopPropagation();showRelatedTracks(${safeTr})" aria-label="Morceaux liés">Liés</button>
-            <div class="vote-count" style="font-size:0.9rem">👍 ${t.votes}${heatIcon}</div>
             <button type="button" class="btn btn-small btn-green ui-btn-play" onclick="event.stopPropagation();playTrack('${t.id}')" aria-label="Lecture">▶</button>
           </div>
         </div>

@@ -1436,6 +1436,140 @@ body.zpeed-idle #queueList .queue-item.zpeed-nudge-target {
 .queue-vote-status--playing {
   color: rgba(147,197,255,0.86);
 }
+.queue-flow-tagline {
+  margin: 6px 0 10px;
+  font-size: 0.74rem;
+  color: rgba(255,255,255,0.62);
+  letter-spacing: 0.01em;
+}
+.collective-trigger-btn {
+  border: 1px solid rgba(167,139,250,0.4);
+  background: rgba(167,139,250,0.12);
+  color: rgba(221,214,254,0.98);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.collective-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  display: grid;
+  place-items: center;
+  background: rgba(5,7,12,0.62);
+  backdrop-filter: blur(4px);
+}
+.collective-card {
+  width: min(92vw, 430px);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 18px;
+  background: rgba(16,19,30,0.96);
+  padding: 14px;
+}
+.collective-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.collective-title {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: rgba(255,255,255,0.96);
+}
+.collective-sub {
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.72);
+  margin-bottom: 10px;
+}
+.collective-timer {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: rgba(110,231,183,0.95);
+}
+.collective-options {
+  display: grid;
+  gap: 8px;
+}
+.collective-option {
+  width: 100%;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.04);
+  border-radius: 12px;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+}
+.collective-thumb {
+  width: 46px;
+  height: 46px;
+  border-radius: 9px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.collective-option-main {
+  min-width: 0;
+  flex: 1;
+}
+.collective-option-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.95);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.collective-option-sub {
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.62);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.collective-option-votes {
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: rgba(255,255,255,0.86);
+}
+.queue-diff-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+.queue-diff-badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.84);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.63rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.queue-diff-badge--top {
+  border-color: rgba(29,185,84,0.38);
+  color: rgba(29,185,84,0.95);
+}
+.queue-diff-badge--waiting {
+  color: rgba(255,255,255,0.78);
+}
+.queue-diff-badge--cooled {
+  border-color: rgba(148,163,184,0.28);
+  color: rgba(148,163,184,0.9);
+}
+.queue-diff-badge--ai {
+  border-color: rgba(167,139,250,0.42);
+  color: rgba(196,181,253,0.95);
+}
 /* Vote heat tiers (vote count vs threshold) */
 .vote-card.zpeed-heat-low { box-shadow: none; }
 .vote-card.zpeed-heat-med {
