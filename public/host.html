@@ -1257,6 +1257,8 @@
   const userId = getOrCreatePersistentUserId();
   const qrDataUrl  = localStorage.getItem('zpeed_qr');
   const speakerNm  = localStorage.getItem('zpeed_hostName') || 'Session active';
+  /** Message démo IRL — pas de texte technique côté utilisateur. */
+  const MSG_SPOTIFY_OPEN_APP = 'Ouvre Spotify une fois puis reviens';
 
   if (!code || !hostId || !hostSecret) window.location.href = window.location.origin + '/index.html';
 
@@ -1481,7 +1483,7 @@
       }
     } else {
       if (fromSpotifyOAuth) {
-        showToast('Spotify doit être reconnecté.');
+        showToast(MSG_SPOTIFY_OPEN_APP);
       }
       if (sync.status === 401 || sync.status === 403 || sync.status === 404) {
         localStorage.removeItem('zpeed_spotify_token');
@@ -1627,18 +1629,18 @@
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.ok) return true;
       if (data?.rateLimited) {
-        markSpotifyUnavailable('Spotify limite les requêtes. Réessaie dans quelques minutes.');
+        markSpotifyUnavailable('rate_limited');
         showToast('Spotify indisponible pour le moment.');
         return false;
       }
       if (res.status === 401 || res.status === 403 || data?.reason === 'activation_failed') {
-        showToast('Session Spotify expirée — reconnecte-toi.');
+        if (play) showToast(MSG_SPOTIFY_OPEN_APP);
         return false;
       }
-      if (play) showToast('Impossible d’activer la lecture.');
+      if (play) showToast(MSG_SPOTIFY_OPEN_APP);
       return false;
     } catch (e) {
-      showToast('Erreur réseau pendant l’activation.');
+      if (play) showToast('Connexion instable — réessaie dans un instant.');
       return false;
     }
   }
@@ -1788,34 +1790,38 @@
     _activateSoundPending = true;
     const st = getHostPlaybackUiState();
     const pickedTrack = getPreferredPlayableTrack();
-    _activateSoundAttempt = 0;
     spotifyActivationUiPending(true);
     try {
       if (!pickedTrack) {
-        showToast('Ajoute un titre');
+        showToast('Ajoute d’abord un titre à la file');
         return;
       }
       if (st === 'no_spotify') {
         const ytOk = await tryYouTubeFallback(pickedTrack);
         if (ytOk) {
-          showToast('Lecture lancée');
+          _activateSoundAttempt = 0;
+          showToast('Son activé — lecture YouTube');
           return;
         }
         connectPlatform('spotify');
-        showToast('Ajoute un titre');
+        _activateSoundAttempt = Math.min(99, _activateSoundAttempt + 1);
+        showToast(MSG_SPOTIFY_OPEN_APP);
         return;
       }
       const spotifyOk = await trySpotifyActivation(pickedTrack);
       if (spotifyOk) {
-        showToast('Musique lancée');
+        _activateSoundAttempt = 0;
+        showToast('Son activé — lecture Spotify');
         return;
       }
       const ytOk = await tryYouTubeFallback(pickedTrack);
       if (ytOk) {
-        showToast('Lecture lancée');
+        _activateSoundAttempt = 0;
+        showToast('Son activé — lecture YouTube');
         return;
       }
-      showToast('Ajoute un titre');
+      _activateSoundAttempt = Math.min(99, _activateSoundAttempt + 1);
+      showToast(MSG_SPOTIFY_OPEN_APP);
     } finally {
       spotifyActivationUiPending(false);
       refreshSpotifyHostUi();
@@ -1886,7 +1892,7 @@
         };
       } else if (st === 'needs_device') {
         hint.hidden = false;
-        hint.textContent = 'Ouvre Spotify puis choisis SONDER.';
+        hint.textContent = MSG_SPOTIFY_OPEN_APP + ' Puis choisis SONDER comme appareil.';
         hint.classList.add('am-playback-hint--tap');
         hint.setAttribute('role', 'button');
         hint.tabIndex = 0;
@@ -1931,7 +1937,7 @@
 
   function retrySpotifyTransferToHostDevice() {
     if (!window._spotifyToken || !window._spotifyDeviceId) {
-      showToast('Appareil Spotify non prêt.');
+      showToast(MSG_SPOTIFY_OPEN_APP);
       return;
     }
     transferPlaybackToHostDevice(false).then(ok => {
@@ -2691,7 +2697,7 @@
       } else {
         status.style.display = 'block';
         status.style.color = '#fbbf24';
-        status.textContent = reason;
+        status.textContent = 'Spotify en pause — réessaie bientôt.';
       }
     }
     refreshSpotifyHostUi();
@@ -2785,7 +2791,7 @@
       return;
     }
     if (!window._spotifyDeviceId) {
-      showToast('Aucun appareil Spotify prêt sur cette page.');
+      showToast(MSG_SPOTIFY_OPEN_APP);
       openAmDeviceHelp('setup');
       return;
     }
@@ -2812,7 +2818,7 @@
       return;
     }
     if (res.status === 401 || res.status === 403) {
-      showToast('Session Spotify expirée ou accès refusé — reconnecte-toi.');
+      showToast(MSG_SPOTIFY_OPEN_APP);
       return;
     }
     setActiveAudioSource('spotify');
@@ -2969,12 +2975,12 @@
 
   socket.on('track:swiped', ({ direction, trackId }) => {
     const card = document.getElementById('swipeVoteCard');
-    if (card) {
+    if (card && trackId != null && String(card.dataset.trackId) === String(trackId)) {
       if (direction === 'like') card.classList.add('swipe-confirm-like');
       if (direction === 'skip') card.classList.add('swipe-confirm-skip');
       setTimeout(() => {
         card.classList.remove('swipe-confirm-like', 'swipe-confirm-skip');
-      }, 260);
+      }, 320);
     }
     if (trackId) {
       const row = document.getElementById('qrow-' + trackId);
@@ -3295,9 +3301,10 @@
     const el = document.getElementById('sessionVibeHost');
     const sub = document.getElementById('sessionVibeHostSub');
     if (!el) return;
-    const vibe = (roomMeta && roomMeta.sessionVibe) ? String(roomMeta.sessionVibe) : 'Mix';
+    const raw = roomMeta && roomMeta.sessionVibe != null && String(roomMeta.sessionVibe).trim() !== '' ? String(roomMeta.sessionVibe).trim() : '';
+    const vibe = raw || 'En cours';
     el.textContent = `Ambiance : ${vibe}`;
-    if (sub) sub.textContent = (roomMeta && roomMeta.sessionVibeSub) ? String(roomMeta.sessionVibeSub) : 'Basé sur les personnes présentes';
+    if (sub) sub.textContent = 'Basé sur les personnes présentes';
     renderMagicInviteHost();
   }
 
@@ -3347,24 +3354,31 @@
     if (!card) return;
     const trackId = card.dataset.trackId;
     const threshold = 78;
+    const resetCardIfSame = () => {
+      const c = document.getElementById('swipeVoteCard');
+      if (!c || String(c.dataset.trackId) !== String(trackId)) return;
+      c.classList.remove('swipe-like', 'swipe-skip');
+      c.style.transform = '';
+      c.style.setProperty('--swipe-like-opacity', '0');
+      c.style.setProperty('--swipe-skip-opacity', '0');
+    };
     if (deltaX > threshold) {
       card.classList.add('swipe-like');
       applySwipeCardTransform(420, 220);
       submitSwipeVote(trackId, 'like');
-      showToast('❤️ Track liké');
+      showToast('❤️ Like enregistré');
+      setTimeout(resetCardIfSame, 420);
       return;
     }
     if (deltaX < -threshold) {
       card.classList.add('swipe-skip');
       applySwipeCardTransform(-420, 220);
       submitSwipeVote(trackId, 'skip');
-      showToast('❌ Track passé');
+      showToast('Skip enregistré');
+      setTimeout(resetCardIfSame, 420);
       return;
     }
-    card.classList.remove('swipe-like', 'swipe-skip');
-    card.style.transform = '';
-    card.style.setProperty('--swipe-like-opacity', '0');
-    card.style.setProperty('--swipe-skip-opacity', '0');
+    resetCardIfSame();
   }
 
   function bindSwipeVoteCard() {
@@ -3407,6 +3421,7 @@
     wrap.innerHTML = `
       <div class="swipe-vote-title">Swipe pour voter</div>
       <div class="swipe-vote-sub">Droite ❤️ Like · Gauche ❌ Skip</div>
+      <div class="swipe-vote-hint" aria-hidden="true"><span class="swipe-vote-hint__arrow">←</span> skip · like <span class="swipe-vote-hint__arrow">→</span></div>
       <div class="swipe-vote-card" id="swipeVoteCard" data-track-id="${track.id}">
         <span class="swipe-vote-badge swipe-vote-badge--like">❤️ LIKE</span>
         <span class="swipe-vote-badge swipe-vote-badge--skip">❌ SKIP</span>
@@ -3716,7 +3731,7 @@
         setTimeout(() => { syncSpotifyPlaybackUi().catch(() => {}); }, 350);
       } catch (e) {
         console.warn('[spotify] togglePlay failed:', e.message);
-        showToast('Lecture Spotify impossible — vérifie l’appareil.');
+        showToast(MSG_SPOTIFY_OPEN_APP);
       }
       return;
     }

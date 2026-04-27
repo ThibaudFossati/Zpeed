@@ -516,13 +516,8 @@
 
       const ytTracks = (ytRes.status === 'fulfilled' ? ytRes.value : []).map(t => ({ ...t, platform: 'youtube' }));
       const spValue  = spRes.status === 'fulfilled' ? spRes.value : [];
-      if (spValue && spValue.__error) {
-        const msg = spValue.body?.message || spValue.body?.error || 'Spotify search failed';
-        document.getElementById('searchResults').innerHTML =
-          `<div class="empty"><div class="empty-text">Spotify: ${msg}</div></div>`;
-        return;
-      }
-      const spTracks = Array.isArray(spValue) ? spValue : [];
+      const spTracks =
+        spValue && spValue.__error ? [] : Array.isArray(spValue) ? spValue : [];
       const results  = [...spTracks, ...ytTracks];
 
       if (!results.length) {
@@ -739,21 +734,29 @@
     if (!card) return;
     const trackId = card.dataset.trackId;
     const threshold = 74;
+    const resetGuestSwipe = () => {
+      const c = document.getElementById('guestSwipeCard');
+      if (!c || String(c.dataset.trackId) !== String(trackId)) return;
+      c.classList.remove('swipe-confirm-like', 'swipe-confirm-skip');
+      c.style.transform = '';
+      c.style.setProperty('--swipe-like-opacity', '0');
+      c.style.setProperty('--swipe-skip-opacity', '0');
+    };
     if (deltaX > threshold) {
       card.classList.add('swipe-confirm-like');
       guestApplySwipeCardTransform(360, 220);
       guestVoteDirection(trackId, 'like');
+      setTimeout(resetGuestSwipe, 420);
       return;
     }
     if (deltaX < -threshold) {
       card.classList.add('swipe-confirm-skip');
       guestApplySwipeCardTransform(-360, 220);
       guestVoteDirection(trackId, 'skip');
+      setTimeout(resetGuestSwipe, 420);
       return;
     }
-    card.style.transform = '';
-    card.style.setProperty('--swipe-like-opacity', '0');
-    card.style.setProperty('--swipe-skip-opacity', '0');
+    resetGuestSwipe();
   }
 
   function bindGuestSwipeCard() {
@@ -970,6 +973,7 @@
       <div class="swipe-vote-wrap">
         <div class="swipe-vote-title">Swipe pour voter</div>
         <div class="swipe-vote-sub">Droite ❤️ Like · Gauche ❌ Skip</div>
+        <div class="swipe-vote-hint" aria-hidden="true"><span class="swipe-vote-hint__arrow">←</span> skip · like <span class="swipe-vote-hint__arrow">→</span></div>
         <div class="swipe-vote-card ${already ? 'swipe-disabled' : ''}" id="guestSwipeCard" data-track-id="${nextTrack.id}">
           <span class="swipe-vote-badge swipe-vote-badge--like">❤️ LIKE</span>
           <span class="swipe-vote-badge swipe-vote-badge--skip">❌ SKIP</span>
@@ -1257,9 +1261,10 @@
     const el = document.getElementById('sessionVibeGuest');
     const sub = document.getElementById('sessionVibeGuestSub');
     if (!el) return;
-    const vibe = (roomMeta && roomMeta.sessionVibe) ? String(roomMeta.sessionVibe) : 'Mix';
+    const raw = roomMeta && roomMeta.sessionVibe != null && String(roomMeta.sessionVibe).trim() !== '' ? String(roomMeta.sessionVibe).trim() : '';
+    const vibe = raw || 'En cours';
     el.textContent = `Ambiance : ${vibe}`;
-    if (sub) sub.textContent = (roomMeta && roomMeta.sessionVibeSub) ? String(roomMeta.sessionVibeSub) : 'Basé sur les personnes présentes';
+    if (sub) sub.textContent = 'Basé sur les personnes présentes';
     syncGuestHostProfileBtn();
   }
 

@@ -1756,6 +1756,21 @@ body.zpeed-idle #queueList .queue-item.zpeed-nudge-target {
   font-size: 0.68rem;
   color: rgba(255,255,255,0.56);
 }
+.swipe-vote-hint {
+  margin-top: 6px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.42);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.swipe-vote-hint__arrow {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.55);
+}
 .swipe-vote-card {
   --swipe-like-opacity: 0;
   --swipe-skip-opacity: 0;
@@ -1858,10 +1873,30 @@ body.zpeed-idle #queueList .queue-item.zpeed-nudge-target {
 .swipe-vote-btn--like { color: rgba(110,231,183,0.96); }
 .swipe-vote-btn--skip { color: rgba(255,132,155,0.96); }
 .swipe-vote-card.swipe-confirm-like {
-  border-color: rgba(110,231,183,0.62);
+  border-color: rgba(110, 231, 183, 0.72);
+  animation: zpeedSwipeConfirmLike 0.34s ease;
 }
 .swipe-vote-card.swipe-confirm-skip {
-  border-color: rgba(255,132,155,0.62);
+  border-color: rgba(255, 132, 155, 0.72);
+  animation: zpeedSwipeConfirmSkip 0.34s ease;
+}
+@keyframes zpeedSwipeConfirmLike {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(110, 231, 183, 0);
+  }
+  45% {
+    box-shadow: 0 0 0 3px rgba(110, 231, 183, 0.35);
+  }
+}
+@keyframes zpeedSwipeConfirmSkip {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 132, 155, 0);
+  }
+  45% {
+    box-shadow: 0 0 0 3px rgba(255, 132, 155, 0.35);
+  }
 }
 
 .queue-item--swipe-drag {
