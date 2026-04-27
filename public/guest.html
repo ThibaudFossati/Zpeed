@@ -432,6 +432,7 @@
   let queue         = [];
   let roomMeta      = {};
   let votedTracks   = new Set();
+  let guestNowPlayingId = null;
   /** @type {Record<string, { v: number, s: string }>} */
   let prevTrackSnap = {};
   const VALIDATION_LABEL = 'VALIDÉ'; // switch here later (e.g. "APPROVED")
@@ -951,6 +952,7 @@
   });
 
   socket.on('track:playing', ({ track }) => {
+    guestNowPlayingId = track && track.id ? String(track.id) : null;
     renderNowPlaying(track); updateMiniPlayer(track);
     if (track) showSyncedMoment(track);
   });
@@ -980,10 +982,18 @@
   });
 
   socket.on('track:swiped', ({ trackId, direction, actor }) => {
-    if (actor === guestName) return;
-    showVotedToast(actor || 'Quelqu’un', direction === 'like' ? '❤️' : '❌');
+    if (actor !== guestName) {
+      showVotedToast(actor || 'Quelqu’un', direction === 'like' ? '❤️' : '❌');
+    }
+    if (trackId) {
+      const row = document.getElementById('qrow-' + trackId);
+      if (row) {
+        row.classList.add(direction === 'like' ? 'queue-row-swipe-confirm-like' : 'queue-row-swipe-confirm-skip');
+        setTimeout(() => row.classList.remove('queue-row-swipe-confirm-like', 'queue-row-swipe-confirm-skip'), 320);
+      }
+    }
     const card = document.getElementById('guestSwipeCard');
-    if (!card || card.dataset.trackId !== trackId) return;
+    if (!card || String(card.dataset.trackId) !== String(trackId)) return;
     card.classList.add(direction === 'like' ? 'swipe-confirm-like' : 'swipe-confirm-skip');
     setTimeout(() => card.classList.remove('swipe-confirm-like', 'swipe-confirm-skip'), 260);
   });
@@ -1087,6 +1097,69 @@
       `;
     }).join('');
   }
+
+  (function bindGuestQueueRowSwipe() {
+    const list = document.getElementById('queueList');
+    if (!list || list.dataset.queueSwipeBound === '1') return;
+    list.dataset.queueSwipeBound = '1';
+    let g = null;
+    function applyRowTransform(row, dx) {
+      const w = row.offsetWidth || 280;
+      const clamp = Math.max(-110, Math.min(110, dx));
+      const ratio = Math.max(-1, Math.min(1, dx / Math.max(100, w * 0.32)));
+      row.style.transform = `translateX(${clamp}px) rotate(${ratio * 3.5}deg)`;
+    }
+    list.addEventListener('pointerdown', e => {
+      const row = e.target.closest('.queue-item[data-track-id]');
+      if (!row || !row.dataset.trackId) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      const tid = String(row.dataset.trackId);
+      if (guestNowPlayingId && tid === guestNowPlayingId) return;
+      g = { row, startX: e.clientX, pid: e.pointerId, id: tid };
+      row.classList.add('queue-item--swipe-drag');
+      row.style.transition = 'none';
+      try {
+        row.setPointerCapture(e.pointerId);
+      } catch (_) {}
+    });
+    function end(ev) {
+      if (!g) return;
+      const row = g.row;
+      const dx = ev && ev.clientX != null ? ev.clientX - g.startX : 0;
+      const id = g.id;
+      const pid = g.pid;
+      g = null;
+      row.classList.remove('queue-item--swipe-drag');
+      row.style.transition = 'transform 0.2s ease';
+      row.style.transform = '';
+      setTimeout(() => {
+        row.style.transition = '';
+      }, 220);
+      try {
+        if (pid != null) row.releasePointerCapture(pid);
+      } catch (_) {}
+      const th = 52;
+      if (dx > th) {
+        if (votedTracks.has(id)) {
+          showToast('⚠️ Déjà swipé !');
+          return;
+        }
+        guestVoteDirection(id, 'like');
+      } else if (dx < -th) {
+        if (votedTracks.has(id)) {
+          showToast('⚠️ Déjà swipé !');
+          return;
+        }
+        guestVoteDirection(id, 'skip');
+      }
+    }
+    list.addEventListener('pointermove', e => {
+      if (!g || e.pointerId !== g.pid) return;
+      applyRowTransform(g.row, e.clientX - g.startX);
+    });
+    list.addEventListener('pointerup', end);
+    list.addEventListener('pointercancel', end);
+  })();
 
   function renderSessionVibeGuest() {
     const el = document.getElementById('sessionVibeGuest');

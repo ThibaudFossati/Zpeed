@@ -1047,6 +1047,7 @@
     </div>
     <div id="swipeVoteWrap" class="swipe-vote-wrap"></div>
     <div id="zpeedHostTop3" class="zpeed-top3-wrap" aria-live="polite"></div>
+    <div id="magicInviteHost" class="magic-invite-host" style="display:none" aria-live="polite"></div>
     <div id="queueList">
       <div class="empty">
         <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
@@ -2950,14 +2951,22 @@
     else b.classList.remove('show');
   });
 
-  socket.on('track:swiped', ({ direction }) => {
+  socket.on('track:swiped', ({ direction, trackId }) => {
     const card = document.getElementById('swipeVoteCard');
-    if (!card) return;
-    if (direction === 'like') card.classList.add('swipe-confirm-like');
-    if (direction === 'skip') card.classList.add('swipe-confirm-skip');
-    setTimeout(() => {
-      card.classList.remove('swipe-confirm-like', 'swipe-confirm-skip');
-    }, 260);
+    if (card) {
+      if (direction === 'like') card.classList.add('swipe-confirm-like');
+      if (direction === 'skip') card.classList.add('swipe-confirm-skip');
+      setTimeout(() => {
+        card.classList.remove('swipe-confirm-like', 'swipe-confirm-skip');
+      }, 260);
+    }
+    if (trackId) {
+      const row = document.getElementById('qrow-' + trackId);
+      if (row) {
+        row.classList.add(direction === 'like' ? 'queue-row-swipe-confirm-like' : 'queue-row-swipe-confirm-skip');
+        setTimeout(() => row.classList.remove('queue-row-swipe-confirm-like', 'queue-row-swipe-confirm-skip'), 320);
+      }
+    }
   });
 
   socket.on('track:playing', async ({ track, fromServer }) => {
@@ -3200,6 +3209,28 @@
     const vibe = (roomMeta && roomMeta.sessionVibe) ? String(roomMeta.sessionVibe) : 'Mix';
     el.textContent = `Ambiance : ${vibe}`;
     if (sub) sub.textContent = (roomMeta && roomMeta.sessionVibeSub) ? String(roomMeta.sessionVibeSub) : 'Basé sur les personnes présentes';
+    renderMagicInviteHost();
+  }
+
+  function renderMagicInviteHost() {
+    const box = document.getElementById('magicInviteHost');
+    if (!box) return;
+    const sug = roomMeta && Array.isArray(roomMeta.magicInviteSuggestions) ? roomMeta.magicInviteSuggestions : [];
+    if (!sug.length) {
+      box.style.display = 'none';
+      box.innerHTML = '';
+      return;
+    }
+    box.style.display = 'block';
+    box.innerHTML =
+      '<div class="magic-invite-host-title">✨ Suggestions d’invités</div>' +
+      sug
+        .map(s => {
+          const name = zpeedEscapeHtmlHost((s && s.name) || 'Guest');
+          const lab = zpeedEscapeHtmlHost((s && s.label) || '');
+          return `<div class="magic-invite-row"><span class="magic-invite-name">${name}</span><span class="magic-invite-label">· ${lab}</span></div>`;
+        })
+        .join('');
   }
 
   let _swipeGesture = null;
@@ -3673,6 +3704,62 @@
     ['pointerdown', 'keydown', 'touchstart', 'scroll'].forEach(ev =>
       window.addEventListener(ev, arm, { passive: true }));
     arm();
+  })();
+
+  (function bindHostQueueRowSwipe() {
+    const list = document.getElementById('queueList');
+    if (!list || list.dataset.queueSwipeBound === '1') return;
+    list.dataset.queueSwipeBound = '1';
+    let g = null;
+    function applyRowTransform(row, dx) {
+      const w = row.offsetWidth || 280;
+      const clamp = Math.max(-110, Math.min(110, dx));
+      const ratio = Math.max(-1, Math.min(1, dx / Math.max(100, w * 0.32)));
+      row.style.transform = `translateX(${clamp}px) rotate(${ratio * 3.5}deg)`;
+    }
+    list.addEventListener('pointerdown', e => {
+      const row = e.target.closest('.queue-item[data-track-id]');
+      if (!row || !row.dataset.trackId) return;
+      if (e.target.closest('button,.queue-item--actions,.btn')) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      g = { row, startX: e.clientX, pid: e.pointerId, id: row.dataset.trackId };
+      row.classList.add('queue-item--swipe-drag');
+      row.style.transition = 'none';
+      try {
+        row.setPointerCapture(e.pointerId);
+      } catch (_) {}
+    });
+    function end(ev) {
+      if (!g) return;
+      const row = g.row;
+      const dx = ev && ev.clientX != null ? ev.clientX - g.startX : 0;
+      const id = g.id;
+      const pid = g.pid;
+      g = null;
+      row.classList.remove('queue-item--swipe-drag');
+      row.style.transition = 'transform 0.2s ease';
+      row.style.transform = '';
+      setTimeout(() => {
+        row.style.transition = '';
+      }, 220);
+      try {
+        if (pid != null) row.releasePointerCapture(pid);
+      } catch (_) {}
+      const th = 52;
+      if (dx > th) {
+        submitSwipeVote(id, 'like');
+        showToast('❤️');
+      } else if (dx < -th) {
+        submitSwipeVote(id, 'skip');
+        showToast('❌');
+      }
+    }
+    list.addEventListener('pointermove', e => {
+      if (!g || e.pointerId !== g.pid) return;
+      applyRowTransform(g.row, e.clientX - g.startX);
+    });
+    list.addEventListener('pointerup', end);
+    list.addEventListener('pointercancel', end);
   })();
 
   // Initial render (updates Am-Bar only — carousel replaced by Observatory)

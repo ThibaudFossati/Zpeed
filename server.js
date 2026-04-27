@@ -128,6 +128,46 @@ function refreshSessionVibeOnly(sessionObj) {
   return sessionObj.sessionVibe;
 }
 
+function pickInviteLabel(r) {
+  const lg = Number(r.likesGiven) || 0;
+  const ta = Number(r.tracksAdded) || 0;
+  if (ta >= 2 && ta >= lg) return 'Découvre de bons sons';
+  if (lg >= 3) return "Apporte de l'énergie";
+  if (ta >= lg && ta >= 1) return 'Découvre de bons sons';
+  if (lg >= 1) return "Apporte de l'énergie";
+  return 'Découvre de bons sons';
+}
+
+function computeMagicInviteSuggestions(session) {
+  const stats = session.contributorStats || {};
+  const rows = Object.entries(stats).map(([userId, r]) => ({
+    userId,
+    name: String((r && r.name) || 'Guest').slice(0, 40),
+    likesGiven: Number(r && r.likesGiven) || 0,
+    tracksAdded: Number(r && r.tracksAdded) || 0
+  }));
+  const active = rows.filter(r => r.likesGiven > 0 || r.tracksAdded > 0);
+  active.sort((a, b) => b.likesGiven + b.tracksAdded - (a.likesGiven + a.tracksAdded));
+  return active.slice(0, 3).map(r => ({
+    userId: r.userId,
+    name: r.name,
+    label: pickInviteLabel(r)
+  }));
+}
+
+function bumpContributor(session, userId, displayName, kind) {
+  if (!session.contributorStats || typeof session.contributorStats !== 'object') session.contributorStats = {};
+  const uid = String(userId || '').trim();
+  if (!uid) return;
+  const row = session.contributorStats[uid] || { name: 'Guest', likesGiven: 0, tracksAdded: 0, lastAt: 0 };
+  if (displayName && String(displayName).trim()) row.name = String(displayName).trim().slice(0, 48);
+  if (kind === 'add') row.tracksAdded = (Number(row.tracksAdded) || 0) + 1;
+  if (kind === 'like') row.likesGiven = (Number(row.likesGiven) || 0) + 1;
+  row.lastAt = Date.now();
+  session.contributorStats[uid] = row;
+  session.magicInviteSuggestions = computeMagicInviteSuggestions(session);
+}
+
 function spotifyApiFailure(res, status, stage, details = {}) {
   const clientMessage =
     typeof details.clientMessage === 'string' && details.clientMessage.trim()
@@ -493,6 +533,8 @@ function hydrateSession(s) {
   if (!Array.isArray(s._trackTasteWindow)) s._trackTasteWindow = [];
   if (!Number.isFinite(s._tasteEventCount)) s._tasteEventCount = 0;
   if (typeof s.hostTasteUserId !== 'string') s.hostTasteUserId = null;
+  if (!s.contributorStats || typeof s.contributorStats !== 'object') s.contributorStats = {};
+  if (!Array.isArray(s.magicInviteSuggestions)) s.magicInviteSuggestions = computeMagicInviteSuggestions(s);
   if (!Array.isArray(s.sessionVibeGenres)) s.sessionVibeGenres = [];
   if (typeof s.sessionVibe !== 'string' || !s.sessionVibe.trim()) s.sessionVibe = 'Mix';
   refreshSessionVibeOnly(s);
@@ -1881,6 +1923,7 @@ io.on('connection', (socket) => {
       code,
       { emitRoomState: true }
     );
+    bumpContributor(s, userId || socket.userId || proposerKey, name, 'add');
     saveSessions();
     io.to(`session:${code}`).emit('queue:update', { queue: s.queue, meta: metaForRoom(s) });
     io.to(`session:${code}`).emit('notification', { message: `🎵 ${name} a proposé "${track.title}"` });
@@ -1946,9 +1989,13 @@ io.on('connection', (socket) => {
       code,
       { emitRoomState: true }
     );
+    if (direction === 'like') {
+      bumpContributor(s, userId || socket.userId || voterKey, guestName || userName || 'Someone', 'like');
+    }
     sortQueueForUi(s);
     tryAcceptSpotifyTracks(s, io, code, saveSessions);
     await ensureQueueDepth(s, code, io, saveSessions, 2);
+    saveSessions();
     io.to(`session:${code}`).emit('queue:update', { queue: s.queue, meta: metaForRoom(s) });
     io.to(`session:${code}`).emit('track:swiped', {
       trackId,
@@ -2040,6 +2087,7 @@ io.on('connection', (socket) => {
     recordTasteUser(s, socket.userId || s.hostTasteUserId || `host:${s.hostId}`, newTrack, 'add', newTrack.id, io, code, {
       emitRoomState: true
     });
+    bumpContributor(s, socket.userId || s.hostTasteUserId || `host:${s.hostId}`, '🎧 Host', 'add');
     saveSessions();
     io.to(`session:${code}`).emit('queue:update', { queue: s.queue, meta: metaForRoom(s) });
     io.to(`session:${code}`).emit('notification', { message: `🎧 Host a ajouté "${track.title}"` });
