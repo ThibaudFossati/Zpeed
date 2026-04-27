@@ -909,11 +909,11 @@
   <script src="notif.js"></script>
   <script src="observatory.js"></script>
 </head>
-<body>
+<body class="sonder-ui sonder-host">
 <div class="container with-player-bar">
 
   <!-- BETA BANNER -->
-  <div style="background:rgba(255,165,0,0.06);border:1px solid rgba(255,165,0,0.14);border-radius:99px;padding:5px 14px;text-align:center;font-size:0.62rem;color:#FFA500;font-weight:600;margin-bottom:4px;letter-spacing:0.3px;align-self:center">
+  <div class="beta-strip" style="background:rgba(255,165,0,0.06);border:1px solid rgba(255,165,0,0.14);border-radius:99px;padding:5px 14px;text-align:center;font-size:0.62rem;color:#FFA500;font-weight:600;margin-bottom:4px;letter-spacing:0.3px;align-self:center">
     🧪 Beta · Tes retours comptent !
   </div>
 
@@ -1066,14 +1066,25 @@
     </div>
   </div>
 
-  <!-- ═══ PANEL : EN COURS — Observatory spatial canvas ═══ -->
+  <!-- ═══ PANEL : EN COURS — flat live hero + observatory (hidden, logic preserved) ═══ -->
   <div class="tab-panel" id="panel-playing">
 
-    <div id="liveMockPill" class="live-mock-pill" role="status" aria-live="polite">Mode test</div>
-    <div id="liveSpotifyDeviceWarn" class="live-spotify-device-warn" role="status" aria-live="polite"></div>
+    <div class="live-stack">
+      <div id="liveMockPill" class="live-mock-pill live-pill" role="status" aria-live="polite">Mode test</div>
+      <div id="liveSpotifyDeviceWarn" class="live-spotify-device-warn live-pill" role="status" aria-live="polite"></div>
+      <div class="live-hero">
+        <img id="liveHeroArt" class="live-hero__art" alt="" decoding="async" width="320" height="320" src="">
+        <div class="live-hero__title" id="liveHeroTitle">—</div>
+        <div class="live-hero__artist" id="liveHeroArtist">—</div>
+        <div class="live-meta" aria-live="polite">
+          <div id="sessionVibeHostLive" class="live-meta__line">—</div>
+          <div id="liveSourceLine" class="live-meta__line live-meta__line--dim"></div>
+        </div>
+      </div>
+    </div>
 
-    <!-- Observatory spatial visualization -->
-    <div class="obs-wrap" id="obsWrap"></div>
+    <!-- Observatory spatial visualization (kept for window.obs; visually hidden) -->
+    <div class="obs-wrap live-obs" id="obsWrap" aria-hidden="true"></div>
 
     <!-- Hidden media players (still needed for playback) -->
     <div id="yt-player" style="display:none;position:absolute;width:1px;height:1px;overflow:hidden;opacity:0">
@@ -1173,26 +1184,16 @@
 
   <!-- ═══ PANEL : QR CODE ═══ -->
   <div class="tab-panel" id="panel-qr">
-    <div class="qr-panel">
-      <div class="qr-wrapper" id="qrWrapper">
-        <div class="qr-card">
-          <canvas id="qrCanvas" width="280" height="280"></canvas>
-        </div>
-        <div class="qr-helper-text">Scan to join</div>
-      </div>
+    <div class="qr-minimal" id="qrWrapper">
+      <canvas id="qrCanvas" width="320" height="320"></canvas>
+      <div class="qr-session-code" id="qrSessionCodeBig" aria-label="Code session"></div>
+      <p class="qr-url-hint" id="qrUrlShort"></p>
     </div>
-    <div class="qr-link-preview" id="qrLinkRow">
-      <span id="qrLinkText"></span>
+    <span id="qrLinkText" hidden></span>
+    <div class="qr-actions-stack">
+      <button type="button" class="btn btn-primary btn-block" onclick="copyQrLink()">Copier le lien</button>
+      <button type="button" class="btn btn-secondary btn-block end-btn terminate-session-btn" onclick="confirmEndSession()">Terminer la session</button>
     </div>
-    <div class="qr-actions-group">
-      <button type="button" class="btn btn-secondary" onclick="copyQrLink()">Copy invite link</button>
-      <button type="button" class="btn btn-secondary" onclick="openShare()">
-        📤 Partager le lien à la place
-      </button>
-    </div>
-    <button type="button" class="end-btn terminate-session-btn" onclick="confirmEndSession()">
-      ⏹ Terminer la session
-    </button>
   </div>
 
 </div><!-- /container -->
@@ -1324,9 +1325,10 @@
   let _qrRAF = null;
   function initLiveQR(matrix, size) {
     const canvas = document.getElementById('qrCanvas');
+    if (!canvas || !canvas.getContext) return;
     const ctx    = canvas.getContext('2d');
     const DPR    = Math.min(window.devicePixelRatio || 1, 2);
-    const CSS_W  = 260;
+    const CSS_W  = Math.min(320, Math.max(220, Math.floor((window.innerWidth || 360) - 40)));
     canvas.style.width  = CSS_W + 'px';
     canvas.style.height = CSS_W + 'px';
     canvas.width  = CSS_W * DPR;
@@ -1369,7 +1371,15 @@
 
   const joinUrl = `${window.location.origin}/?code=${encodeURIComponent(code)}`;
   document.getElementById('shareLinkText').textContent = joinUrl;
-  document.getElementById('qrLinkText').textContent    = joinUrl;
+  const qrTxt = document.getElementById('qrLinkText');
+  if (qrTxt) qrTxt.textContent = joinUrl;
+  const qrSessionBig = document.getElementById('qrSessionCodeBig');
+  if (qrSessionBig) qrSessionBig.textContent = code;
+  const qrUrlHint = document.getElementById('qrUrlShort');
+  if (qrUrlHint) {
+    const u = joinUrl.replace(/^https?:\/\//, '');
+    qrUrlHint.textContent = u.length > 52 ? u.slice(0, 49) + '…' : u;
+  }
   window._joinUrl = joinUrl;
 
   const socket = io();
@@ -1662,6 +1672,24 @@
     return state;
   }
 
+  function syncLiveHeroFromAmBar() {
+    const t = document.getElementById('amTitle');
+    const a = document.getElementById('amArtist');
+    const th = document.getElementById('amThumb');
+    const lt = document.getElementById('liveHeroTitle');
+    const la = document.getElementById('liveHeroArtist');
+    const lart = document.getElementById('liveHeroArt');
+    if (lt && t) lt.textContent = t.textContent || '—';
+    if (la && a) la.textContent = a.textContent || '—';
+    if (lart && th) {
+      lart.src = th.src || '';
+      lart.onerror = function () {
+        this.onerror = null;
+        if (typeof THUMB_FALLBACK !== 'undefined') this.src = THUMB_FALLBACK;
+      };
+    }
+  }
+
   function applySpotifyPlaybackStateToUi(state) {
     if (!state || !state.track) return;
     const currentUri = state.track.uri || null;
@@ -1692,6 +1720,7 @@
       progressWrap.hidden = false;
       progressFill.style.width = Math.max(0, Math.min(100, (state.progressMs / state.track.durationMs) * 100)) + '%';
     }
+    syncLiveHeroFromAmBar();
     refreshSpotifyHostUi();
   }
 
@@ -1928,6 +1957,12 @@
     } else if (hint && _activeAudioSource) {
       hint.hidden = true;
       hint.textContent = '';
+    }
+    const liveSrc = document.getElementById('liveSourceLine');
+    if (liveSrc) {
+      if (_activeAudioSource === 'youtube') liveSrc.textContent = 'Lecture via YouTube';
+      else if (_activeAudioSource === 'spotify') liveSrc.textContent = 'Lecture via Spotify';
+      else liveSrc.textContent = '';
     }
     if (locked) {
       stopProgressSim();
@@ -3196,16 +3231,15 @@
       const stClass = 'status-' + stKey;
       const heatTier = 'zpeed-heat-low';
       const isPlayingNow = currentTrack && t.id === currentTrack.id;
-      const stateBadge = '<span class="queue-diff-badge queue-diff-badge--waiting">En attente</span>';
-      const aiBadge = t.aiSuggested
-        ? '<span class="queue-diff-badge queue-diff-badge--ai">Auto-DJ</span>'
-        : '';
-      const diffBadges = `<div class="queue-diff-badges">${stateBadge}${aiBadge}</div>`;
+      const diffBadges = '';
       const likes = Number(t.likes) || 0;
       const skips = Number(t.skips) || 0;
+      const thVotes = roomMeta.voteThreshold != null ? Number(roomMeta.voteThreshold) : NaN;
       const voteLabel = isPlayingNow
         ? 'En lecture'
-        : `❤️ ${likes}  ·  ❌ ${skips}`;
+        : Number.isFinite(thVotes)
+          ? `👍 ${likes} / ${thVotes} votes`
+          : `👍 ${likes} votes`;
       const voteLabelClass = isPlayingNow
         ? 'queue-vote-status queue-vote-status--playing'
         : 'queue-vote-status queue-vote-status--pending';
@@ -3223,7 +3257,6 @@
                 ? `<button type="button" class="queue-proposer-tap" data-profile-user="${encodeURIComponent(String(t.proposedByUserId))}">${t.proposedBy === '🎧 Host' ? '🎧 Host' : '🎤 ' + t.proposedBy}</button>`
                 : `<span>${t.proposedBy === '🎧 Host' ? '🎧 Host' : '🎤 ' + t.proposedBy}</span>`
             }</div>
-            ${diffBadges}
             <div class="${voteLabelClass}">${voteLabel}</div>
             ${voters ? `<div class="voter-avatars">${voters}</div>` : ''}
           </div>
@@ -3313,6 +3346,8 @@
     const vibe = raw || 'En cours';
     el.textContent = `Ambiance : ${vibe}`;
     if (sub) sub.textContent = 'Basé sur les personnes présentes';
+    const liveV = document.getElementById('sessionVibeHostLive');
+    if (liveV) liveV.textContent = el.textContent;
     renderMagicInviteHost();
   }
 
@@ -3427,16 +3462,15 @@
     const likes = Number(track.likes) || 0;
     const skips = Number(track.skips) || 0;
     wrap.innerHTML = `
-      <div class="swipe-vote-title">Swipe pour voter</div>
-      <div class="swipe-vote-sub">Droite ❤️ Like · Gauche ❌ Skip</div>
-      <div class="swipe-vote-hint" aria-hidden="true"><span class="swipe-vote-hint__arrow">←</span> skip · like <span class="swipe-vote-hint__arrow">→</span></div>
+      <div class="swipe-vote-title">Swipe</div>
+      <div class="swipe-vote-hint swipe-vote-hint--lr" aria-hidden="true"><span>← Skip</span><span>Like →</span></div>
       <div class="swipe-vote-card" id="swipeVoteCard" data-track-id="${track.id}">
         <span class="swipe-vote-badge swipe-vote-badge--like">❤️ LIKE</span>
         <span class="swipe-vote-badge swipe-vote-badge--skip">❌ SKIP</span>
         <img class="swipe-vote-cover" src="${track.thumbnail || THUMB_FALLBACK}" alt="${track.title || 'Track'}" onerror="this.onerror=null;this.src=THUMB_FALLBACK">
         <div class="swipe-vote-track">${track.title || 'Track'}</div>
         <div class="swipe-vote-artist">${track.channel || 'SONDER'}</div>
-        <div class="swipe-vote-counts">❤️ ${likes} · ❌ ${skips}</div>
+        <div class="swipe-vote-counts">👍 ${likes}${skips ? ` · ${skips} skip` : ''}</div>
         <div class="swipe-vote-actions">
           <button type="button" class="swipe-vote-btn swipe-vote-btn--skip" onclick="submitSwipeVote('${track.id}','skip')">❌</button>
           <button type="button" class="swipe-vote-btn swipe-vote-btn--like" onclick="submitSwipeVote('${track.id}','like')">❤️</button>
@@ -3649,7 +3683,19 @@
   }
 
   function updateAmBar(track) {
-    if (!track) { document.getElementById('amBar').classList.remove('visible'); applyAmBarPlaybackUi(); return; }
+    if (!track) {
+      document.getElementById('amBar').classList.remove('visible');
+      const lt = document.getElementById('liveHeroTitle');
+      const la = document.getElementById('liveHeroArtist');
+      const lart = document.getElementById('liveHeroArt');
+      if (lt) lt.textContent = '—';
+      if (la) la.textContent = '—';
+      if (lart && typeof THUMB_FALLBACK !== 'undefined') {
+        lart.src = THUMB_FALLBACK;
+      }
+      applyAmBarPlaybackUi();
+      return;
+    }
     const bar = document.getElementById('amBar');
     const art = document.getElementById('amThumb');
     const artUrl = track.thumbnail || '';
@@ -3665,6 +3711,7 @@
     }
     const progress = document.getElementById('amProgress');
     if (progress) progress.hidden = !(track.duration_ms || track.preview);
+    syncLiveHeroFromAmBar();
     applyAmBarPlaybackUi();
   }
 

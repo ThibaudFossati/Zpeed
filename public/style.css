@@ -2621,3 +2621,367 @@ a.btn-spotify {
   .zpeed-react-float { animation: none; opacity: 0; }
   .zpeed-momentum-fill { transition: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SONDER — radical minimal full-screen IRL (flat, no glass, mobile-first)
+   ═══════════════════════════════════════════════════════════════════════════ */
+body.sonder-ui {
+  --space-xl: clamp(1.5rem, 5vw, 2.75rem);
+  --radius-xl: 28px;
+  --screen-max: min(100vw, 720px);
+}
+
+body.sonder-ui .container {
+  max-width: var(--screen-max);
+  width: 100%;
+  padding-left: max(14px, env(safe-area-inset-left));
+  padding-right: max(14px, env(safe-area-inset-right));
+  padding-bottom: calc(var(--space-xl) + var(--mini-player-height, 96px) + env(safe-area-inset-bottom, 0px));
+}
+
+body.sonder-host.with-player-bar .container {
+  padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
+}
+
+body.sonder-ui .beta-strip {
+  display: none;
+}
+
+body.sonder-ui .glass {
+  background: var(--bg2) !important;
+  border: 1px solid var(--border2) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.sonder-ui .tab-bar {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-xl);
+  box-shadow: none;
+  padding: 6px;
+  gap: 4px;
+}
+
+body.sonder-ui .tab-btn {
+  border-radius: calc(var(--radius-xl) - 6px);
+  box-shadow: none;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+body.sonder-ui .tab-btn.active {
+  background: var(--text);
+  color: var(--bg);
+}
+
+body.sonder-host .track-ticker-bar {
+  display: none;
+}
+
+body.sonder-host #panel-queue > .queue-flow-tagline:first-of-type {
+  display: none;
+}
+
+body.sonder-ui #panel-queue .section-title {
+  font-size: clamp(0.72rem, 2.5vw, 0.82rem);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text2);
+}
+
+body.sonder-ui #queueList .queue-item,
+body.sonder-ui #hostSearchResults .host-result,
+body.sonder-ui #hostSearchResults .search-result {
+  box-shadow: none !important;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border2);
+  background: var(--bg2);
+}
+
+body.sonder-ui #queueList .queue-thumb {
+  width: clamp(88px, 28vw, 120px);
+  height: clamp(88px, 28vw, 120px);
+  border-radius: var(--radius);
+}
+
+body.sonder-host #queueList .host-q-idx {
+  display: none !important;
+}
+
+body.sonder-ui .queue-status-pill {
+  color: var(--text2);
+  font-weight: 700;
+}
+
+body.sonder-ui .vote-count--quiet {
+  font-size: 0.75rem !important;
+  color: var(--text3);
+  align-self: center;
+}
+
+body.sonder-ui .magic-invite-host {
+  box-shadow: none;
+  border: 1px solid var(--border2);
+  background: var(--bg2);
+}
+
+/* ── Live (host) ── */
+body.sonder-host #panel-playing.active {
+  min-height: calc(100dvh - 200px);
+  justify-content: flex-start;
+}
+
+body.sonder-host .live-stack {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--space-xl);
+  padding: var(--space-xl) 0 calc(var(--space-xl) + 40px);
+}
+
+body.sonder-host .live-pill {
+  align-self: center;
+}
+
+body.sonder-host .live-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 420px;
+}
+
+body.sonder-host .live-hero__art {
+  width: min(72vw, 320px);
+  height: min(72vw, 320px);
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--border2);
+  background: var(--bg3);
+}
+
+body.sonder-host .live-hero__title {
+  font-size: clamp(1.35rem, 5.5vw, 2rem);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  max-width: 100%;
+  padding: 0 8px;
+}
+
+body.sonder-host .live-hero__artist {
+  font-size: clamp(0.95rem, 3.2vw, 1.15rem);
+  color: var(--text2);
+  font-weight: 600;
+}
+
+body.sonder-host .live-meta {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+body.sonder-host .live-meta__line {
+  font-size: clamp(0.78rem, 2.4vw, 0.92rem);
+  color: var(--text2);
+}
+
+body.sonder-host .live-meta__line--dim {
+  opacity: 0.85;
+}
+
+body.sonder-host .live-obs {
+  display: none !important;
+}
+
+body.sonder-host .reaction-pill {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+
+/* Transport bar: flat, one clear CTA when locked */
+body.sonder-ui .am-bar {
+  max-width: var(--screen-max);
+  left: max(10px, env(safe-area-inset-left));
+  right: max(10px, env(safe-area-inset-right));
+  border-radius: var(--radius-xl);
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  box-shadow: none;
+}
+
+body.sonder-ui .am-bar.am-bar--simple .am-bar-row {
+  display: none;
+}
+
+body.sonder-ui .am-activate-btn {
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border2);
+  background: var(--text);
+  color: var(--bg);
+  font-size: clamp(0.95rem, 3.5vw, 1.05rem);
+  min-height: 52px;
+}
+
+body.sonder-ui .am-track-pill {
+  border-radius: var(--radius-xl);
+  background: var(--bg3);
+  box-shadow: none;
+}
+
+body.sonder-ui .am-thumb {
+  box-shadow: none;
+}
+
+body.sonder-ui .am-progress-fill {
+  background: var(--text);
+}
+
+/* ── QR (host) ── */
+body.sonder-host .qr-minimal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xl);
+  padding: var(--space-xl) 0;
+}
+
+body.sonder-host .qr-minimal canvas {
+  display: block;
+  border-radius: var(--radius);
+  border: 1px solid var(--border2);
+}
+
+body.sonder-host .qr-session-code {
+  font-family: 'Roboto', sans-serif;
+  font-size: clamp(1.75rem, 8vw, 2.75rem);
+  font-weight: 900;
+  letter-spacing: 0.35em;
+  text-indent: 0.35em;
+  color: var(--text);
+}
+
+body.sonder-host .qr-url-hint {
+  font-size: 0.78rem;
+  color: var(--text2);
+  text-align: center;
+  max-width: 100%;
+  word-break: break-all;
+  padding: 0 8px;
+}
+
+body.sonder-host .qr-actions-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ── Guest vote hero ── */
+body.sonder-guest .guest-vote-stage {
+  min-height: calc(100dvh - 220px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+body.sonder-guest .guest-vote-stage .swipe-vote-wrap--guest-hero {
+  width: 100%;
+  max-width: 440px;
+}
+
+body.sonder-guest .guest-vote-stage .swipe-vote-card {
+  width: min(92vw, 400px);
+  max-width: none;
+  box-shadow: none;
+  border-radius: var(--radius-xl);
+}
+
+body.sonder-guest .guest-vote-stage .swipe-vote-cover {
+  width: min(78vw, 300px);
+  height: min(78vw, 300px);
+  max-width: none;
+}
+
+body.sonder-guest .swipe-vote-hint--lr {
+  display: flex;
+  justify-content: space-between;
+  width: min(92vw, 400px);
+  font-size: clamp(0.85rem, 3.5vw, 1rem);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: 4px;
+}
+
+body.sonder-host .swipe-vote-hint--lr {
+  display: flex;
+  justify-content: space-between;
+  width: min(92vw, 360px);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+body.sonder-guest .zpeed-top3-wrap--compact {
+  margin-bottom: 8px;
+}
+
+body.sonder-guest .section-title--minimal {
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text2);
+  border: none;
+  margin-bottom: 4px;
+}
+
+body.sonder-guest .guest-propose #searchSection .section-title {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text2);
+}
+
+@media (min-width: 900px) {
+  body.sonder-ui .container {
+    padding-left: max(24px, env(safe-area-inset-left));
+    padding-right: max(24px, env(safe-area-inset-right));
+  }
+}
+
+body.sonder-ui .voter-av,
+body.sonder-ui .voter-av-more {
+  box-shadow: none !important;
+}
+
+body.sonder-guest .mini-player {
+  box-shadow: none;
+  border: 1px solid var(--border2);
+  background: var(--bg2);
+}
+
+body.sonder-guest #syncedMoment {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(8, 8, 12, 0.97);
+}
+
+body.sonder-guest .voted-toast {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}

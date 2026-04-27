@@ -141,11 +141,11 @@
     }
   </style>
 </head>
-<body>
+<body class="sonder-ui sonder-guest">
 <div class="container with-mini">
 
   <!-- BETA BANNER -->
-  <div style="background:rgba(255,165,0,0.06);border:1px solid rgba(255,165,0,0.14);border-radius:99px;padding:5px 14px;text-align:center;font-size:0.62rem;color:#FFA500;font-weight:600;margin-bottom:4px;letter-spacing:0.3px;align-self:center">
+  <div class="beta-strip" style="background:rgba(255,165,0,0.06);border:1px solid rgba(255,165,0,0.14);border-radius:99px;padding:5px 14px;text-align:center;font-size:0.62rem;color:#FFA500;font-weight:600;margin-bottom:4px;letter-spacing:0.3px;align-self:center">
     🧪 Bêta · Propose tes sons via YouTube
   </div>
   <div id="guestRoomHint" style="display:none;font-size:0.65rem;color:var(--text2);text-align:center;margin-bottom:6px;line-height:1.35"></div>
@@ -184,7 +184,7 @@
   </div>
 
   <!-- ═══ PANEL : PROPOSER ═══ -->
-  <div class="tab-panel active" id="panel-propose">
+  <div class="tab-panel active guest-propose" id="panel-propose">
 
     <!-- Paywall si non abonné -->
     <div class="paywall-banner" id="paywallBanner" style="display:none">
@@ -220,10 +220,10 @@
   </div>
 
   <!-- ═══ PANEL : VOTER ═══ -->
-  <div class="tab-panel" id="panel-vote">
-    <div class="section-title">🗳 Voter pour les sons</div>
-    <div id="zpeedGuestTop3" class="zpeed-top3-wrap" aria-live="polite"></div>
-    <div id="voteList">
+  <div class="tab-panel guest-vote-stage" id="panel-vote">
+    <div class="section-title section-title--minimal">Voter</div>
+    <div id="zpeedGuestTop3" class="zpeed-top3-wrap zpeed-top3-wrap--compact" aria-live="polite"></div>
+    <div id="voteList" class="guest-swipe-stage">
       <div class="empty">
         <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3L15.5 9H20.5L16.5 13L18 19.5L12 16L6 19.5L7.5 13L3.5 9H8.5L12 3Z"/></svg></div>
         <div class="empty-text">Aucune proposition à voter pour l'instant</div>
@@ -971,17 +971,16 @@
     const skips = Number(nextTrack.skips) || 0;
     const already = votedTracks.has(nextTrack.id);
     el.innerHTML = `
-      <div class="swipe-vote-wrap">
-        <div class="swipe-vote-title">Swipe pour voter</div>
-        <div class="swipe-vote-sub">Droite ❤️ Like · Gauche ❌ Skip</div>
-        <div class="swipe-vote-hint" aria-hidden="true"><span class="swipe-vote-hint__arrow">←</span> skip · like <span class="swipe-vote-hint__arrow">→</span></div>
+      <div class="swipe-vote-wrap swipe-vote-wrap--guest-hero">
+        <div class="swipe-vote-title">Swipe</div>
+        <div class="swipe-vote-hint swipe-vote-hint--lr" aria-hidden="true"><span>← Skip</span><span>Like →</span></div>
         <div class="swipe-vote-card ${already ? 'swipe-disabled' : ''}" id="guestSwipeCard" data-track-id="${nextTrack.id}">
           <span class="swipe-vote-badge swipe-vote-badge--like">❤️ LIKE</span>
           <span class="swipe-vote-badge swipe-vote-badge--skip">❌ SKIP</span>
           <img class="swipe-vote-cover" src="${nextTrack.thumbnail || THUMB_FALLBACK}" onerror="this.onerror=null;this.src=THUMB_FALLBACK" alt="">
           <div class="swipe-vote-track">${nextTrack.title}</div>
           <div class="swipe-vote-artist">${nextTrack.channel || 'SONDER'}</div>
-          <div class="swipe-vote-counts">❤️ ${likes} · ❌ ${skips}</div>
+          <div class="swipe-vote-counts">👍 ${likes}${skips ? ` · ${skips} skip` : ''}</div>
           <div class="swipe-vote-actions">
             <button class="swipe-vote-btn swipe-vote-btn--skip" type="button" onclick="guestVoteDirection('${nextTrack.id}','skip')" ${already ? 'disabled' : ''}>❌</button>
             <button class="swipe-vote-btn swipe-vote-btn--like" type="button" onclick="guestVoteDirection('${nextTrack.id}','like')" ${already ? 'disabled' : ''}>❤️</button>
@@ -1174,28 +1173,35 @@
       const likes = Number(t.likes) || 0;
       const skips = Number(t.skips) || 0;
       const score = likes - skips;
-      const st =
-        t.status === 'accepted' ? '✓ Validé' :
-        t.status === 'spotify_queued' ? 'Spotify' :
+      const isPlayingRow = guestNowPlayingId && String(guestNowPlayingId) === String(t.id);
+      const stLine =
+        isPlayingRow ? '' :
+        t.status === 'accepted' ? 'Validé' :
+        t.status === 'spotify_queued' ? 'Validé' :
         t.status === 'pending' ? 'En attente' : '';
+      const thG = roomMeta.voteThreshold != null ? Number(roomMeta.voteThreshold) : NaN;
+      const voteLine = isPlayingRow
+        ? 'En lecture'
+        : Number.isFinite(thG)
+          ? `👍 ${likes} / ${thG} votes`
+          : `👍 ${likes} votes`;
       return `
         <div class="queue-item track-card ${isOwn ? 'playing' : ''} ${stClass}" id="qrow-${t.id}" data-track-id="${t.id || ''}">
           <div class="zpeed-react-layer" aria-hidden="true"></div>
           <span class="zpeed-validated-tag">${VALIDATION_LABEL}</span>
-          <div style="font-family:'Roboto', sans-serif;font-size:1.1rem;font-weight:700;color:var(--text2);min-width:20px;text-align:center;align-self:flex-start;padding-top:2px">${i+1}</div>
           <img class="queue-thumb" src="${t.thumbnail}"
             onerror="this.onerror=null;this.src=THUMB_FALLBACK">
           <div class="queue-info">
             <div class="queue-title">${t.title}</div>
-            <div class="queue-meta">${t.channel}${st ? ` · <span style="color:var(--purple-light);font-weight:600">${st}</span>` : ''}</div>
-            <div class="queue-vote-status">❤️ ${likes} · ❌ ${skips}</div>
+            <div class="queue-meta">${t.channel}${stLine ? ` · <span class="queue-status-pill">${stLine}</span>` : ''}</div>
+            <div class="queue-vote-status">${voteLine}</div>
             <div class="queue-proposer">${
               !isOwn && t.proposedByUserId
                 ? `<button type="button" class="queue-proposer-tap" data-profile-user="${encodeURIComponent(String(t.proposedByUserId))}">${'🎤 ' + t.proposedBy}</button>`
                 : `<span>${isOwn ? '⭐ Toi' : '🎤 ' + t.proposedBy}</span>`
             }</div>
           </div>
-          <div class="vote-count" style="font-size:0.95rem">${score > 0 ? '+' + score : score}</div>
+          <div class="vote-count vote-count--quiet">${score > 0 ? '+' + score : score}</div>
         </div>
       `;
     }).join('');
