@@ -2,6 +2,7 @@ node_modules
 .env
 sessions.json
 taste-profiles.json
+sonder-social-profiles.json
 *.log
 .DS_Store
 private/

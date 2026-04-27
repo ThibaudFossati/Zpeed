@@ -299,7 +299,7 @@
   <!-- ═══ PANEL : PROFIL ═══ -->
   <div class="tab-panel" id="panel-profil">
     <!-- Guest card -->
-    <div class="glass" style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+    <div class="glass guest-identity-tap" id="guestIdentityTap" role="button" tabindex="0" style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
       <div id="profilAvatar" style="
         width:72px;height:72px;flex-shrink:0;
         box-shadow:0 4px 18px rgba(0,0,0,0.40);
@@ -354,7 +354,9 @@
       </div>
       <div class="profil-stat">
         <span>Hôte</span>
-        <span id="statHost" style="font-weight:600"></span>
+        <button type="button" class="stat-host-btn" id="statHostBtn" disabled aria-label="Profil hôte">
+          <span id="statHost" style="font-weight:600"></span>
+        </button>
       </div>
     </div>
 
@@ -1090,7 +1092,11 @@
             <div class="queue-title">${t.title}</div>
             <div class="queue-meta">${t.channel}${st ? ` · <span style="color:var(--purple-light);font-weight:600">${st}</span>` : ''}</div>
             <div class="queue-vote-status">❤️ ${likes} · ❌ ${skips}</div>
-            <div class="queue-proposer">${isOwn ? '⭐ Toi' : '🎤 ' + t.proposedBy}</div>
+            <div class="queue-proposer">${
+              !isOwn && t.proposedByUserId
+                ? `<button type="button" class="queue-proposer-tap" data-profile-user="${encodeURIComponent(String(t.proposedByUserId))}">${'🎤 ' + t.proposedBy}</button>`
+                : `<span>${isOwn ? '⭐ Toi' : '🎤 ' + t.proposedBy}</span>`
+            }</div>
           </div>
           <div class="vote-count" style="font-size:0.95rem">${score > 0 ? '+' + score : score}</div>
         </div>
@@ -1168,6 +1174,20 @@
     const vibe = (roomMeta && roomMeta.sessionVibe) ? String(roomMeta.sessionVibe) : 'Mix';
     el.textContent = `Ambiance : ${vibe}`;
     if (sub) sub.textContent = (roomMeta && roomMeta.sessionVibeSub) ? String(roomMeta.sessionVibeSub) : 'Basé sur les personnes présentes';
+    syncGuestHostProfileBtn();
+  }
+
+  function syncGuestHostProfileBtn() {
+    const b = document.getElementById('statHostBtn');
+    if (!b) return;
+    const hid = roomMeta && roomMeta.hostProfileUserId ? String(roomMeta.hostProfileUserId) : '';
+    if (hid) {
+      b.disabled = false;
+      b.setAttribute('data-profile-user', encodeURIComponent(hid));
+    } else {
+      b.disabled = true;
+      b.removeAttribute('data-profile-user');
+    }
   }
 
   function stringToColor(str) {
@@ -1222,6 +1242,75 @@
     return cv.toDataURL('image/png');
   }
 
+  function formatSonderPositiveStatsGuest(st) {
+    if (!st || typeof st !== 'object') return 'Ta présence nourrit la soirée ✨';
+    const parts = [];
+    if (st.likesReceived > 0) parts.push(`${st.likesReceived} coup${st.likesReceived > 1 ? 's' : ''} de cœur reçus`);
+    if (st.tracksPlayed > 0) parts.push(`${st.tracksPlayed} morceau${st.tracksPlayed > 1 ? 'x' : ''} passé${st.tracksPlayed > 1 ? 's' : ''} en piste`);
+    if (st.tracksAdded > 0) parts.push(`${st.tracksAdded} titre${st.tracksAdded > 1 ? 's' : ''} ajouté${st.tracksAdded > 1 ? 's' : ''}`);
+    if (st.sessionsJoined > 0) parts.push(`${st.sessionsJoined} soirée${st.sessionsJoined > 1 ? 's' : ''} rejointe${st.sessionsJoined > 1 ? 's' : ''}`);
+    if (st.sessionsHosted > 0) parts.push(`${st.sessionsHosted} session${st.sessionsHosted > 1 ? 's' : ''} créée${st.sessionsHosted > 1 ? 's' : ''}`);
+    return parts.length ? parts.join(' · ') : 'Ta présence nourrit la soirée ✨';
+  }
+
+  function closeSonderProfile() {
+    const ov = document.getElementById('sonderProfileOverlay');
+    if (ov) {
+      ov.classList.remove('open');
+      ov.setAttribute('aria-hidden', 'true');
+    }
+    document.body.classList.remove('sonder-profile-open');
+  }
+
+  function openSonderProfile(targetUserId) {
+    const tid = String(targetUserId || '').trim();
+    if (!tid) return;
+    const ov = document.getElementById('sonderProfileOverlay');
+    if (!ov) return;
+    ov.classList.add('open');
+    ov.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('sonder-profile-open');
+    document.getElementById('sonderProfileName').textContent = '…';
+    document.getElementById('sonderProfileRole').textContent = '';
+    document.getElementById('sonderProfileGenres').textContent = '';
+    const vh0 = document.getElementById('sonderProfileVibeHost');
+    if (vh0) {
+      vh0.style.display = 'none';
+      vh0.textContent = '';
+    }
+    document.getElementById('sonderProfileStats').textContent = '';
+    const av0 = document.getElementById('sonderProfileAvatar');
+    if (av0) av0.innerHTML = '';
+    fetch(`/api/profile/${encodeURIComponent(tid)}?code=${encodeURIComponent(code)}`)
+      .then(r => {
+        if (!r.ok) throw new Error('profile');
+        return r.json();
+      })
+      .then(data => {
+        document.getElementById('sonderProfileName').textContent = data.displayName || '—';
+        document.getElementById('sonderProfileRole').textContent = data.roleLabel || '';
+        document.getElementById('sonderProfileGenres').textContent = data.topGenresLine || '—';
+        const vh = document.getElementById('sonderProfileVibeHost');
+        if (vh) {
+          if (data.preferredVibe) {
+            vh.style.display = 'block';
+            vh.textContent = 'Vibe en session : ' + data.preferredVibe;
+          } else {
+            vh.style.display = 'none';
+            vh.textContent = '';
+          }
+        }
+        document.getElementById('sonderProfileStats').textContent = formatSonderPositiveStatsGuest(data.stats);
+        const av = document.getElementById('sonderProfileAvatar');
+        const nm = data.displayName || '?';
+        if (av) av.innerHTML = `<img src="${avatarUrl(nm, 96)}" alt="" width="96" height="96" style="border-radius:50%;display:block;object-fit:cover">`;
+      })
+      .catch(() => {
+        closeSonderProfile();
+        showToast('Profil indisponible');
+      });
+  }
+
   // ─────────────────────────────────────────────
   // ACTIONS
   // ─────────────────────────────────────────────
@@ -1259,6 +1348,42 @@
       if (data.currentTrack) { renderNowPlaying(data.currentTrack); updateMiniPlayer(data.currentTrack); }
     });
 
+  (function bindSonderProfileUiGuest() {
+    const tap = document.getElementById('guestIdentityTap');
+    if (tap && !tap.dataset.sonderBound) {
+      tap.dataset.sonderBound = '1';
+      tap.addEventListener('click', () => openSonderProfile(userId));
+      tap.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          openSonderProfile(userId);
+        }
+      });
+    }
+    const hb = document.getElementById('statHostBtn');
+    if (hb && !hb.dataset.sonderBound) {
+      hb.dataset.sonderBound = '1';
+      hb.addEventListener('click', () => {
+        const u = hb.getAttribute('data-profile-user');
+        if (u) openSonderProfile(decodeURIComponent(u));
+      });
+    }
+    const ql = document.getElementById('queueList');
+    if (ql && !ql.dataset.sonderProfileDel) {
+      ql.dataset.sonderProfileDel = '1';
+      ql.addEventListener('click', e => {
+        const btn = e.target.closest('.queue-proposer-tap[data-profile-user]');
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        openSonderProfile(decodeURIComponent(btn.getAttribute('data-profile-user')));
+      });
+    }
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeSonderProfile();
+    });
+  })();
+
   (function initZpeedIdleNudge() {
     let idleTimer;
     const IDLE_MS = 12000;
@@ -1292,5 +1417,21 @@
     arm();
   })();
 </script>
+
+<div id="sonderProfileOverlay" class="sonder-profile-overlay" aria-hidden="true">
+  <div class="sonder-profile-backdrop" onclick="closeSonderProfile()"></div>
+  <div class="sonder-profile-sheet" role="dialog" aria-modal="true" aria-labelledby="sonderProfileName">
+    <button type="button" class="sonder-profile-close" onclick="closeSonderProfile()" aria-label="Fermer">×</button>
+    <div class="sonder-profile-hero">
+      <div class="sonder-profile-avatar" id="sonderProfileAvatar"></div>
+      <div class="sonder-profile-name" id="sonderProfileName">—</div>
+      <div class="sonder-profile-role" id="sonderProfileRole"></div>
+      <div class="sonder-profile-genres" id="sonderProfileGenres"></div>
+      <div class="sonder-profile-vibehost" id="sonderProfileVibeHost" style="display:none"></div>
+      <p class="sonder-profile-stats" id="sonderProfileStats"></p>
+    </div>
+    <p class="sonder-profile-foot">Identité musicale SONDER</p>
+  </div>
+</div>
 </body>
 </html>

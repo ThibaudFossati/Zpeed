@@ -29,10 +29,12 @@ const {
 const { tryAcceptSpotifyTracks, sortQueueForUi, metaForRoom } = require('./lib/queueAccept');
 const { tickSpotifyPipeline, initSpotifyPipelineState } = require('./lib/spotifyPipeline');
 const social = require('./lib/socialMusic');
+const userSocial = require('./lib/userSocialProfile');
 
 const SPOTIFY_PRECREATE_STATE = '__precreate__';
 const TASTE_FILE = path.join(__dirname, 'taste-profiles.json');
 const tasteProfiles = {};
+const socialProfiles = {};
 const TASTE_EMIT_INTERVAL = 4;
 
 /** Room codes are stored uppercase; OAuth state must match. Precreate flag is case-insensitive. */
@@ -535,6 +537,7 @@ function hydrateSession(s) {
   if (typeof s.hostTasteUserId !== 'string') s.hostTasteUserId = null;
   if (!s.contributorStats || typeof s.contributorStats !== 'object') s.contributorStats = {};
   if (!Array.isArray(s.magicInviteSuggestions)) s.magicInviteSuggestions = computeMagicInviteSuggestions(s);
+  if (!s.socialJoinDedupe || typeof s.socialJoinDedupe !== 'object') s.socialJoinDedupe = {};
   if (!Array.isArray(s.sessionVibeGenres)) s.sessionVibeGenres = [];
   if (typeof s.sessionVibe !== 'string' || !s.sessionVibe.trim()) s.sessionVibe = 'Mix';
   refreshSessionVibeOnly(s);
@@ -1437,6 +1440,7 @@ function saveSessions() {
 // ─────────────────────────────────────────────
 const sessions = {};
 loadTasteProfiles();
+userSocial.loadSocialProfiles(socialProfiles);
 loadSessions();
 
 // speakerSessions : speakerName → sessionCode
@@ -1686,7 +1690,7 @@ app.post('/api/session/create', async (req, res) => {
     });
   }
 
-  const { hostName } = req.body;
+  const { hostName, userId: createUserId } = req.body;
   const code = Math.random().toString(36).substring(2, 6).toUpperCase();
   const hostId = uuidv4();
   const hostSecret = uuidv4();
@@ -1709,6 +1713,11 @@ app.post('/api/session/create', async (req, res) => {
   };
   hydrateSession(sessions[code]);
   delete req.session.pendingHostSpotify;
+  const createUid = String(createUserId || '').trim();
+  if (createUid) {
+    userSocial.bump(socialProfiles, createUid, 'sessionsHosted', hostName || 'Host');
+    userSocial.saveSocialProfiles(socialProfiles);
+  }
   saveSessions();
 
   const base = getRequestPublicBase(req);
@@ -1726,7 +1735,7 @@ app.post('/api/session/create', async (req, res) => {
 });
 
 app.post('/api/session/join', (req, res) => {
-  const { code, guestName } = req.body;
+  const { code, guestName, userId: joinUserId } = req.body;
   const session = sessions[code];
   if (!session) return res.status(404).json({ success: false, message: 'Session introuvable' });
   if (!session.hostSpotify?.tokens?.access_token) {
@@ -1734,7 +1743,8 @@ app.post('/api/session/join', (req, res) => {
   }
 
   const guestId = uuidv4();
-  session.guests.push({ id: guestId, name: guestName || 'Guest' });
+  const gid = String(joinUserId || '').trim() || null;
+  session.guests.push({ id: guestId, name: guestName || 'Guest', userId: gid });
   session.guestCount++;
   saveSessions();
 
@@ -1760,6 +1770,27 @@ app.get('/api/session/:code', (req, res) => {
     googleConnected: !!(session.hostGoogle),
     meta: metaForRoom(session)
   });
+});
+
+app.get('/api/profile/:userId', (req, res) => {
+  let uid = String(req.params.userId || '').trim();
+  try {
+    uid = decodeURIComponent(uid);
+  } catch (_) {
+    uid = String(req.params.userId || '').trim();
+  }
+  if (!uid || uid.length > 160 || !/^[a-zA-Z0-9:_-]+$/.test(uid)) {
+    return res.status(400).json({ error: 'invalid_user_id' });
+  }
+  const code = String(req.query.code || '')
+    .trim()
+    .toUpperCase();
+  const sess = code && sessions[code] ? sessions[code] : null;
+  const hostUid = sess && typeof sess.hostTasteUserId === 'string' ? sess.hostTasteUserId : '';
+  const preferredVibe = sess && hostUid && hostUid === uid && sess.sessionVibe ? String(sess.sessionVibe) : null;
+  const row = userSocial.getRow(socialProfiles, uid);
+  const taste = tasteProfiles[uid] || null;
+  res.json(userSocial.buildPublicProfile(uid, row, taste, { preferredVibe }));
 });
 
 app.get('/api/search', async (req, res) => {
@@ -1819,7 +1850,7 @@ io.on('connection', (socket) => {
     return null;
   };
 
-  socket.on('host:join', ({ code, hostId, hostSecret, userId }) => {
+  socket.on('host:join', ({ code, hostId, hostSecret, userId, displayName: hostDisplayName }) => {
     const s = sessions[code];
     if (!s || s.hostId !== hostId || s.hostSecret !== hostSecret) return;
     socket.join(`session:${code}`);
@@ -1831,6 +1862,9 @@ io.on('connection', (socket) => {
     addHostSocket(s, socket.id);
     addActiveUser(s, socket.userId);
     s.hostTasteUserId = socket.userId;
+    const hn = String(hostDisplayName || s.hostName || '').trim();
+    if (hn) userSocial.touchDisplayName(socialProfiles, socket.userId, hn);
+    if (hn) userSocial.saveSocialProfiles(socialProfiles);
     refreshSessionVibeOnly(s);
     saveSessions();
     io.to(`session:${code}`).emit('session:update', {
@@ -1876,7 +1910,16 @@ io.on('connection', (socket) => {
     socket.data.code = code;
     addGuestSocket(s, guestId, socket.id);
     addActiveUser(s, socket.userId);
+    const gEntry = Array.isArray(s.guests) ? s.guests.find(x => x && x.id === guestId) : null;
+    if (gEntry && socket.userId) gEntry.userId = String(socket.userId).trim();
     refreshSessionVibeOnly(s);
+    const juid = String(socket.userId || '').trim();
+    if (juid && s.socialJoinDedupe && !s.socialJoinDedupe[juid]) {
+      s.socialJoinDedupe[juid] = true;
+      userSocial.bump(socialProfiles, juid, 'sessionsJoined', guestName);
+      userSocial.saveSocialProfiles(socialProfiles);
+      saveSessions();
+    }
 
     io.to(`session:${code}`).emit('session:update', {
       guestCount: s.guestCount,
@@ -1898,12 +1941,14 @@ io.on('connection', (socket) => {
     const name = guestName || userName || 'Anonyme';
     const proposerKey =
       guestId || (hostId && s.hostId === hostId ? `host:${s.hostId}` : `anon:${socket.id}`);
+    const proposerUid = String(userId || socket.userId || proposerKey || '').trim();
     const trackId = uuidv4();
     const newTrack = ensureTrackModel({
       id: trackId,
       ...track,
       votes: 1,
       proposedBy: name,
+      proposedByUserId: proposerUid,
       voters: [proposerKey],
       voterNames: [name],
       status: 'pending',
@@ -1924,6 +1969,10 @@ io.on('connection', (socket) => {
       { emitRoomState: true }
     );
     bumpContributor(s, userId || socket.userId || proposerKey, name, 'add');
+    if (proposerUid) {
+      userSocial.bump(socialProfiles, proposerUid, 'tracksAdded', name);
+      userSocial.saveSocialProfiles(socialProfiles);
+    }
     saveSessions();
     io.to(`session:${code}`).emit('queue:update', { queue: s.queue, meta: metaForRoom(s) });
     io.to(`session:${code}`).emit('notification', { message: `🎵 ${name} a proposé "${track.title}"` });
@@ -1992,6 +2041,15 @@ io.on('connection', (socket) => {
     if (direction === 'like') {
       bumpContributor(s, userId || socket.userId || voterKey, guestName || userName || 'Someone', 'like');
     }
+    if (direction === 'like') {
+      const likerUid = String(userId || socket.userId || voterKey || '').trim();
+      const ownerUid = String(track.proposedByUserId || '').trim();
+      const aiLike = /sonder ai/i.test(String(track.proposedBy || ''));
+      if (ownerUid && likerUid && ownerUid !== likerUid && !aiLike) {
+        userSocial.bump(socialProfiles, ownerUid, 'likesReceived', null);
+        userSocial.saveSocialProfiles(socialProfiles);
+      }
+    }
     sortQueueForUi(s);
     tryAcceptSpotifyTracks(s, io, code, saveSessions);
     await ensureQueueDepth(s, code, io, saveSessions, 2);
@@ -2029,6 +2087,11 @@ io.on('connection', (socket) => {
     s.queue = s.queue.filter(t => t.id !== trackId);
     if (s.currentTrack) rememberPlayedTrack(s, s.currentTrack);
     s.currentTrack = ensureTrackModel(track, s);
+    const playOwner = String(s.currentTrack.proposedByUserId || '').trim();
+    if (playOwner && !s.currentTrack.aiSuggested) {
+      userSocial.bump(socialProfiles, playOwner, 'tracksPlayed', s.currentTrack.proposedBy || null);
+      userSocial.saveSocialProfiles(socialProfiles);
+    }
     const tasteUid = userId || socket.userId || s.hostTasteUserId || `host:${s.hostId}`;
     recordTasteUser(s, tasteUid, s.currentTrack, 'play', s.currentTrack.id, io, code, { emitRoomState: true });
     saveSessions();
@@ -2070,11 +2133,13 @@ io.on('connection', (socket) => {
     if (!isHostSocketAuthorized(socket, code)) return;
     const s = sessions[code];
     if (!s) return;
+    const hostPropUid = String(socket.userId || s.hostTasteUserId || `host:${s.hostId}`).trim();
     const newTrack = ensureTrackModel({
       id: uuidv4(),
       ...track,
       votes: 0,
       proposedBy: '🎧 Host',
+      proposedByUserId: hostPropUid,
       voters: [],
       voterNames: [],
       status: 'pending',
@@ -2088,6 +2153,10 @@ io.on('connection', (socket) => {
       emitRoomState: true
     });
     bumpContributor(s, socket.userId || s.hostTasteUserId || `host:${s.hostId}`, '🎧 Host', 'add');
+    if (hostPropUid) {
+      userSocial.bump(socialProfiles, hostPropUid, 'tracksAdded', '🎧 Host');
+      userSocial.saveSocialProfiles(socialProfiles);
+    }
     saveSessions();
     io.to(`session:${code}`).emit('queue:update', { queue: s.queue, meta: metaForRoom(s) });
     io.to(`session:${code}`).emit('notification', { message: `🎧 Host a ajouté "${track.title}"` });

@@ -920,8 +920,17 @@
 
   <!-- HEADER -->
   <div class="header">
-    <a href="index.html" class="logo"><img src="logo.png" alt="ZPEED" class="logo-img"></a>
-    <div style="display:flex;gap:8px;align-items:center">
+    <div class="header-left-cluster">
+      <a href="index.html" class="logo"><img src="logo.png" alt="ZPEED" class="logo-img"></a>
+      <button type="button" class="sonder-host-chip" id="sonderHostChip" title="Ton identité musicale">
+        <span class="sonder-host-chip-av" id="sonderHostChipAv"></span>
+        <span class="sonder-host-chip-meta">
+          <span class="sonder-host-chip-label">Hôte</span>
+          <span class="sonder-host-chip-name" id="sonderHostChipName">—</span>
+        </span>
+      </button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
       <!-- Spotify chip -->
       <span class="spotify-header-chip" id="spotifyChip" role="button" tabindex="0"
         title="Spotify — options"
@@ -1361,7 +1370,10 @@
   window._joinUrl = joinUrl;
 
   const socket = io();
-  function joinRoom() { socket.emit('host:join', { code, hostId, hostSecret, userId }); }
+  function joinRoom() {
+    const hostDisplayName = localStorage.getItem('zpeed_hostName') || 'Host';
+    socket.emit('host:join', { code, hostId, hostSecret, userId, displayName: hostDisplayName });
+  }
   socket.on('connect', joinRoom);
 
   let queue        = [];
@@ -3188,7 +3200,11 @@
           <div class="queue-info" style="flex:1;min-width:0">
             <div class="queue-title">${t.title}</div>
             <div class="queue-meta">${t.channel || ''}</div>
-            <div class="queue-proposer">${t.proposedBy === '🎧 Host' ? '🎧 Host' : '🎤 ' + t.proposedBy}</div>
+            <div class="queue-proposer">${
+              t.proposedByUserId
+                ? `<button type="button" class="queue-proposer-tap" data-profile-user="${encodeURIComponent(String(t.proposedByUserId))}">${t.proposedBy === '🎧 Host' ? '🎧 Host' : '🎤 ' + t.proposedBy}</button>`
+                : `<span>${t.proposedBy === '🎧 Host' ? '🎧 Host' : '🎤 ' + t.proposedBy}</span>`
+            }</div>
             ${diffBadges}
             <div class="${voteLabelClass}">${voteLabel}</div>
             ${voters ? `<div class="voter-avatars">${voters}</div>` : ''}
@@ -3200,6 +3216,75 @@
         </div>
       `;
     }).join('');
+  }
+
+  function formatSonderPositiveStats(st) {
+    if (!st || typeof st !== 'object') return 'Ta présence nourrit la soirée ✨';
+    const parts = [];
+    if (st.likesReceived > 0) parts.push(`${st.likesReceived} coup${st.likesReceived > 1 ? 's' : ''} de cœur reçus`);
+    if (st.tracksPlayed > 0) parts.push(`${st.tracksPlayed} morceau${st.tracksPlayed > 1 ? 'x' : ''} passé${st.tracksPlayed > 1 ? 's' : ''} en piste`);
+    if (st.tracksAdded > 0) parts.push(`${st.tracksAdded} titre${st.tracksAdded > 1 ? 's' : ''} ajouté${st.tracksAdded > 1 ? 's' : ''}`);
+    if (st.sessionsJoined > 0) parts.push(`${st.sessionsJoined} soirée${st.sessionsJoined > 1 ? 's' : ''} rejointe${st.sessionsJoined > 1 ? 's' : ''}`);
+    if (st.sessionsHosted > 0) parts.push(`${st.sessionsHosted} session${st.sessionsHosted > 1 ? 's' : ''} créée${st.sessionsHosted > 1 ? 's' : ''}`);
+    return parts.length ? parts.join(' · ') : 'Ta présence nourrit la soirée ✨';
+  }
+
+  function closeSonderProfile() {
+    const ov = document.getElementById('sonderProfileOverlay');
+    if (ov) {
+      ov.classList.remove('open');
+      ov.setAttribute('aria-hidden', 'true');
+    }
+    document.body.classList.remove('sonder-profile-open');
+  }
+
+  function openSonderProfile(targetUserId) {
+    const tid = String(targetUserId || '').trim();
+    if (!tid) return;
+    const ov = document.getElementById('sonderProfileOverlay');
+    if (!ov) return;
+    ov.classList.add('open');
+    ov.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('sonder-profile-open');
+    document.getElementById('sonderProfileName').textContent = '…';
+    document.getElementById('sonderProfileRole').textContent = '';
+    document.getElementById('sonderProfileGenres').textContent = '';
+    const vh0 = document.getElementById('sonderProfileVibeHost');
+    if (vh0) {
+      vh0.style.display = 'none';
+      vh0.textContent = '';
+    }
+    document.getElementById('sonderProfileStats').textContent = '';
+    const av0 = document.getElementById('sonderProfileAvatar');
+    if (av0) av0.innerHTML = '';
+    fetch(`/api/profile/${encodeURIComponent(tid)}?code=${encodeURIComponent(code)}`)
+      .then(r => {
+        if (!r.ok) throw new Error('profile');
+        return r.json();
+      })
+      .then(data => {
+        document.getElementById('sonderProfileName').textContent = data.displayName || '—';
+        document.getElementById('sonderProfileRole').textContent = data.roleLabel || '';
+        document.getElementById('sonderProfileGenres').textContent = data.topGenresLine || '—';
+        const vh = document.getElementById('sonderProfileVibeHost');
+        if (vh) {
+          if (data.preferredVibe) {
+            vh.style.display = 'block';
+            vh.textContent = 'Vibe en session : ' + data.preferredVibe;
+          } else {
+            vh.style.display = 'none';
+            vh.textContent = '';
+          }
+        }
+        document.getElementById('sonderProfileStats').textContent = formatSonderPositiveStats(data.stats);
+        const av = document.getElementById('sonderProfileAvatar');
+        const nm = data.displayName || '?';
+        if (av) av.innerHTML = `<img src="${avatarUrl(nm, 96)}" alt="" width="96" height="96" style="border-radius:50%;display:block;object-fit:cover">`;
+      })
+      .catch(() => {
+        closeSonderProfile();
+        showToast('Profil indisponible');
+      });
   }
 
   function renderSessionVibeHost() {
@@ -3228,7 +3313,11 @@
         .map(s => {
           const name = zpeedEscapeHtmlHost((s && s.name) || 'Guest');
           const lab = zpeedEscapeHtmlHost((s && s.label) || '');
-          return `<div class="magic-invite-row"><span class="magic-invite-name">${name}</span><span class="magic-invite-label">· ${lab}</span></div>`;
+          const uid = s && s.userId ? String(s.userId) : '';
+          if (!uid) {
+            return `<div class="magic-invite-row"><span class="magic-invite-name">${name}</span><span class="magic-invite-label">· ${lab}</span></div>`;
+          }
+          return `<button type="button" class="magic-invite-row magic-invite-row--btn" data-profile-user="${encodeURIComponent(uid)}"><span class="magic-invite-name">${name}</span><span class="magic-invite-label">· ${lab}</span></button>`;
         })
         .join('');
   }
@@ -3336,8 +3425,13 @@
       el.innerHTML = `<div class="empty"><div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0-3-3.87"/></svg></div><div class="empty-text">Aucun guest pour l'instant.<br>Fais scanner le QR code !</div></div>`;
       return;
     }
-    el.innerHTML = guests.map(g => `
-      <div class="guest-item">
+    el.innerHTML = guests
+      .map(g => {
+        const uid = g.userId ? String(g.userId) : '';
+        const uidAttr = uid ? ` data-profile-user="${encodeURIComponent(uid)}"` : '';
+        const itemCls = uid ? 'guest-item guest-item--profile' : 'guest-item';
+        return `
+      <div class="${itemCls}"${uidAttr}>
         <div class="guest-avatar">
           <img src="${avatarUrl(g.name, 80)}" alt="${g.name}"
                onerror="this.onerror=null;this.style.display='none';this.parentElement.textContent='${g.name.charAt(0).toUpperCase()}';this.parentElement.style.background='${stringToColor(g.name)}'">
@@ -3347,8 +3441,9 @@
           <div style="font-size:0.75rem;color:var(--text2)">Guest</div>
         </div>
         <span class="badge active" style="font-size:0.65rem"><span class="dot pulse"></span> Live</span>
-      </div>
-    `).join('');
+      </div>`;
+      })
+      .join('');
   }
 
   function stringToColor(str) {
@@ -3762,8 +3857,71 @@
     list.addEventListener('pointercancel', end);
   })();
 
+  (function bindSonderProfileUiHost() {
+    const magic = document.getElementById('magicInviteHost');
+    if (magic && !magic.dataset.sonderDel) {
+      magic.dataset.sonderDel = '1';
+      magic.addEventListener('click', e => {
+        const b = e.target.closest('[data-profile-user]');
+        if (!b) return;
+        e.preventDefault();
+        openSonderProfile(decodeURIComponent(b.getAttribute('data-profile-user')));
+      });
+    }
+    const gl = document.getElementById('guestsList');
+    if (gl && !gl.dataset.sonderDel) {
+      gl.dataset.sonderDel = '1';
+      gl.addEventListener('click', e => {
+        const row = e.target.closest('.guest-item[data-profile-user]');
+        if (!row) return;
+        e.preventDefault();
+        openSonderProfile(decodeURIComponent(row.getAttribute('data-profile-user')));
+      });
+    }
+    const ql = document.getElementById('queueList');
+    if (ql && !ql.dataset.sonderProfileDel) {
+      ql.dataset.sonderProfileDel = '1';
+      ql.addEventListener('click', e => {
+        const btn = e.target.closest('.queue-proposer-tap[data-profile-user]');
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        openSonderProfile(decodeURIComponent(btn.getAttribute('data-profile-user')));
+      });
+    }
+    const chip = document.getElementById('sonderHostChip');
+    if (chip && !chip.dataset.bound) {
+      chip.dataset.bound = '1';
+      chip.addEventListener('click', () => openSonderProfile(userId));
+    }
+    const hn = localStorage.getItem('zpeed_hostName') || 'Host';
+    const nmEl = document.getElementById('sonderHostChipName');
+    if (nmEl) nmEl.textContent = hn;
+    const avEl = document.getElementById('sonderHostChipAv');
+    if (avEl) avEl.innerHTML = `<img src="${avatarUrl(hn, 40)}" alt="" width="32" height="32" style="border-radius:50%;display:block;object-fit:cover">`;
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeSonderProfile();
+    });
+  })();
+
   // Initial render (updates Am-Bar only — carousel replaced by Observatory)
   renderCarousel();
 </script>
+
+<div id="sonderProfileOverlay" class="sonder-profile-overlay" aria-hidden="true">
+  <div class="sonder-profile-backdrop" onclick="closeSonderProfile()"></div>
+  <div class="sonder-profile-sheet" role="dialog" aria-modal="true" aria-labelledby="sonderProfileName">
+    <button type="button" class="sonder-profile-close" onclick="closeSonderProfile()" aria-label="Fermer">×</button>
+    <div class="sonder-profile-hero">
+      <div class="sonder-profile-avatar" id="sonderProfileAvatar"></div>
+      <div class="sonder-profile-name" id="sonderProfileName">—</div>
+      <div class="sonder-profile-role" id="sonderProfileRole"></div>
+      <div class="sonder-profile-genres" id="sonderProfileGenres"></div>
+      <div class="sonder-profile-vibehost" id="sonderProfileVibeHost" style="display:none"></div>
+      <p class="sonder-profile-stats" id="sonderProfileStats"></p>
+    </div>
+    <p class="sonder-profile-foot">Identité musicale SONDER</p>
+  </div>
+</div>
 </body>
 </html>
