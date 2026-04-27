@@ -983,6 +983,10 @@
     }
   });
 
+  socket.on('influence:soft_feedback', ({ label }) => {
+    if (label) showToast('✨ ' + label);
+  });
+
   socket.on('track:swiped', ({ trackId, direction, actor }) => {
     if (actor !== guestName) {
       showVotedToast(actor || 'Quelqu’un', direction === 'like' ? '❤️' : '❌');

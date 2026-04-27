@@ -2963,6 +2963,10 @@
     else b.classList.remove('show');
   });
 
+  socket.on('influence:soft_feedback', ({ label }) => {
+    if (label) showToast('✨ ' + label);
+  });
+
   socket.on('track:swiped', ({ direction, trackId }) => {
     const card = document.getElementById('swipeVoteCard');
     if (card) {

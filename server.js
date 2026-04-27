@@ -30,6 +30,7 @@ const { tryAcceptSpotifyTracks, sortQueueForUi, metaForRoom } = require('./lib/q
 const { tickSpotifyPipeline, initSpotifyPipelineState } = require('./lib/spotifyPipeline');
 const social = require('./lib/socialMusic');
 const userSocial = require('./lib/userSocialProfile');
+const softInfluence = require('./lib/softInfluence');
 
 const SPOTIFY_PRECREATE_STATE = '__precreate__';
 const TASTE_FILE = path.join(__dirname, 'taste-profiles.json');
@@ -246,6 +247,7 @@ function ensureTrackModel(track, session) {
   if (!Array.isArray(track.genres)) track.genres = [];
   if (!Number.isFinite(track.likes)) track.likes = 0;
   if (!Number.isFinite(track.skips)) track.skips = 0;
+  if (!Number.isFinite(track.softInfluenceBonus)) track.softInfluenceBonus = 0;
   if (!Array.isArray(track.likedBy)) track.likedBy = [];
   if (!Array.isArray(track.skippedBy)) track.skippedBy = [];
   if (!track.primaryGenre) track.primaryGenre = social.mapTrackToGenre(track);
@@ -538,6 +540,13 @@ function hydrateSession(s) {
   if (!s.contributorStats || typeof s.contributorStats !== 'object') s.contributorStats = {};
   if (!Array.isArray(s.magicInviteSuggestions)) s.magicInviteSuggestions = computeMagicInviteSuggestions(s);
   if (!s.socialJoinDedupe || typeof s.socialJoinDedupe !== 'object') s.socialJoinDedupe = {};
+  if (!s._joinGenreNudge || typeof s._joinGenreNudge !== 'object') {
+    s._joinGenreNudge = social.emptyGenreCounts();
+  } else {
+    for (const g of social.GENRE_BUCKETS) {
+      s._joinGenreNudge[g] = Math.max(0, Math.min(0.55, Number(s._joinGenreNudge[g]) || 0));
+    }
+  }
   if (!Array.isArray(s.sessionVibeGenres)) s.sessionVibeGenres = [];
   if (typeof s.sessionVibe !== 'string' || !s.sessionVibe.trim()) s.sessionVibe = 'Mix';
   refreshSessionVibeOnly(s);
@@ -1865,6 +1874,8 @@ io.on('connection', (socket) => {
     const hn = String(hostDisplayName || s.hostName || '').trim();
     if (hn) userSocial.touchDisplayName(socialProfiles, socket.userId, hn);
     if (hn) userSocial.saveSocialProfiles(socialProfiles);
+    const hostProf = ensureTasteProfile(socket.userId);
+    social.applyJoinProfileNudge(s, hostProf);
     refreshSessionVibeOnly(s);
     saveSessions();
     io.to(`session:${code}`).emit('session:update', {
@@ -1912,6 +1923,8 @@ io.on('connection', (socket) => {
     addActiveUser(s, socket.userId);
     const gEntry = Array.isArray(s.guests) ? s.guests.find(x => x && x.id === guestId) : null;
     if (gEntry && socket.userId) gEntry.userId = String(socket.userId).trim();
+    const joinProf = ensureTasteProfile(socket.userId);
+    social.applyJoinProfileNudge(s, joinProf);
     refreshSessionVibeOnly(s);
     const juid = String(socket.userId || '').trim();
     if (juid && s.socialJoinDedupe && !s.socialJoinDedupe[juid]) {
@@ -2018,9 +2031,15 @@ io.on('connection', (socket) => {
     ensureTrackModel(track, s);
     if (track.likedBy.includes(voterKey) || track.skippedBy.includes(voterKey)) return;
 
+    let softFeedbackLabel = null;
     if (direction === 'like') {
       track.likes += 1;
       track.likedBy.push(voterKey);
+      const likerUidForInf = String(userId || socket.userId || voterKey || '').trim();
+      if (likerUidForInf) {
+        const inf = softInfluence.applyLikeSoftWeight(track, likerUidForInf, s, tasteProfiles, socialProfiles);
+        softFeedbackLabel = inf.label;
+      }
     } else if (direction === 'skip') {
       track.skips += 1;
       track.skippedBy.push(voterKey);
@@ -2062,6 +2081,9 @@ io.on('connection', (socket) => {
       likes: track.likes || 0,
       skips: track.skips || 0
     });
+    if (direction === 'like' && softFeedbackLabel) {
+      socket.emit('influence:soft_feedback', { label: softFeedbackLabel });
+    }
     tickSpotifyPipeline({ session: s, code, io, processEnv: process.env, saveSessions }).catch(() => {});
   });
 
