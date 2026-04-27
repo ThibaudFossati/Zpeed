@@ -1012,22 +1012,16 @@
         <span id="status-spotify" style="width:7px;height:7px;border-radius:50%;background:transparent;display:none;flex-shrink:0"></span>
       </button>
     </div>
-    <div class="search-wrap" style="margin-bottom:8px">
-      <div class="search-field-row">
-        <input type="text" id="hostSearchInput" class="input input--search" placeholder="Rechercher un titre ou un artiste"
+    <div class="search-wrap search-wrap--host-hero" style="margin-bottom:8px">
+      <div class="search-field-row search-field-row--hero">
+        <input type="text" id="hostSearchInput" class="input input--search host-search-hero__input" placeholder="Cherche un son"
                autocomplete="off" spellcheck="false"
                oninput="onSearchInput(this.value)"
                onkeydown="onSearchKeydown(event)">
-        <button type="button" class="btn-search" id="hostSearchBtn" onclick="hostSearch()" aria-label="Rechercher">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <line x1="5" y1="12" x2="19" y2="12"/>
-            <polyline points="13 6 19 12 13 18"/>
-          </svg>
-        </button>
       </div>
-      <div class="host-search-live--panel" id="hostSearchResults" role="region" aria-live="polite" aria-label="Résultats de recherche"></div>
+      <p class="sources-search-hint sources-search-hint--hero" id="sourcesSearchHint">Ajoute un titre en 1 clic</p>
+      <div class="host-search-live--panel host-search-live--hero" id="hostSearchResults" role="region" aria-live="polite" aria-label="Résultats de recherche"></div>
     </div>
-    <p class="sources-search-hint" id="sourcesSearchHint">Ajoute un titre en 1 clic</p>
 
     <!-- Playlists panel (inside platforms tab) -->
     <div id="playlistsPanel" style="display:none;margin-bottom:16px">
@@ -2214,7 +2208,7 @@
   let _liveSearchSeq = 0;
   const _searchCache = new Map();
   const _SEARCH_CACHE_TTL_MS = 30000;
-  const _SEARCH_DEBOUNCE_MS = 450;
+  const _SEARCH_DEBOUNCE_MS = 220;
   let _spotifySearchBlockedUntil = 0;
 
   function escapeHtml(s) {
@@ -2277,10 +2271,13 @@
       return;
     }
     if (!panelOpen) {
-      if (e.key === 'Enter') hostSearch();
+      if (e.key === 'Enter') {
+        const q = document.getElementById('hostSearchInput').value.trim();
+        if (q.length >= 2) executeLiveSearch(q, { fromButton: false });
+      }
       return;
     }
-    const items = box.querySelectorAll('.sugg-item');
+    const items = box.querySelectorAll('.sugg-item--hero, .sugg-item');
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       _suggestIndex = Math.min(_suggestIndex + 1, items.length - 1);
@@ -2294,7 +2291,8 @@
         e.preventDefault();
         selectSuggestion(_suggestData[_suggestIndex]);
       } else {
-        hostSearch();
+        const q = document.getElementById('hostSearchInput').value.trim();
+        if (q.length >= 2) executeLiveSearch(q, { fromButton: false });
       }
     }
   }
@@ -2311,22 +2309,22 @@
   function buildSuggItemHtml(t, i) {
     const safe = JSON.stringify(t).replace(/"/g, '&quot;');
     const thumb = t.thumbnail
-      ? `<img class="sugg-thumb" src="${t.thumbnail}" alt="" onerror="this.style.display='none'">`
-      : `<div class="sugg-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>`;
+      ? `<img class="sugg-thumb sugg-thumb--hero" src="${t.thumbnail}" alt="" onerror="this.style.display='none'">`
+      : `<div class="sugg-icon sugg-thumb--hero"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>`;
     const devMock = (t.isMock || t.isDevMock) ? ' · DEV MOCK' : '';
     const plat = t.platform === 'spotify' ? '' : ' · YT';
     const sub = escapeHtml((t.channel || t.artist || '') + plat + devMock);
     return `
-      <div class="sugg-item" data-idx="${i}" role="option">
-        <div class="sugg-main" onclick='selectSuggestion(${safe})">
+      <div class="sugg-item sugg-item--hero" data-idx="${i}" role="option">
+        <div class="sugg-row-hit" onclick='selectSuggestion(${safe})'>
           ${thumb}
           <div class="sugg-text">
             <div class="sugg-title">${escapeHtml(t.title || '')}</div>
             <div class="sugg-artist">${sub}</div>
           </div>
+          <button type="button" class="sugg-add-chip" onclick='event.stopPropagation();selectSuggestion(${safe})' aria-label="Ajouter à la file">+</button>
         </div>
-        <button type="button" class="sugg-related-btn" onclick='event.stopPropagation();showRelatedTracks(${safe})' aria-label="Morceaux liés">Liés</button>
-        <div class="sugg-add" onclick='event.stopPropagation();selectSuggestion(${safe})' role="button" tabindex="0" aria-label="Ajouter">+</div>
+        <button type="button" class="sugg-related-inline" onclick='event.stopPropagation();showRelatedTracks(${safe})' aria-label="Morceaux liés">Morceaux liés</button>
       </div>`;
   }
 
@@ -2484,7 +2482,6 @@
 
   async function executeLiveSearch(q, { fromButton }) {
     const box = document.getElementById('hostSearchResults');
-    const searchBtn = document.getElementById('hostSearchBtn');
     const mySeq = ++_liveSearchSeq;
 
     if (!box) {
@@ -2494,11 +2491,6 @@
 
     console.log('[HOST_SEARCH] fetch start', { q: q.slice(0, 48), fromButton, seq: mySeq });
     console.log('[HOST_SEARCH] render target found', { id: 'hostSearchResults', inDom: !!box });
-
-    if (fromButton && searchBtn) {
-      searchBtn.classList.add('is-loading');
-      searchBtn.disabled = true;
-    }
 
     try {
       box.classList.add('open');
@@ -2539,11 +2531,6 @@
       box.innerHTML = `<div class="sugg-empty" style="color:#f87171">${escapeHtml(msg)}</div>`;
       box.classList.add('open');
       console.log('[HOST_SEARCH] render done visible', { mode: 'exception', err: msg });
-    } finally {
-      if (fromButton && searchBtn) {
-        searchBtn.classList.remove('is-loading');
-        searchBtn.disabled = false;
-      }
     }
   }
 
@@ -2571,8 +2558,6 @@
 
   function selectSuggestion(track) {
     hideSuggestions();
-    document.getElementById('hostSearchInput').value = track.title;
-    document.getElementById('hostSearchResults').innerHTML = '';
     hostAddTrack(track);
   }
 
@@ -2591,14 +2576,19 @@
       document.getElementById('hostSearchResults').innerHTML = '';
       return;
     }
-    executeLiveSearch(q, { fromButton: true });
+    executeLiveSearch(q, { fromButton: false });
   }
 
   function hostAddTrack(track) {
     const hostName = localStorage.getItem('zpeed_hostName') || 'Host';
     const normalizedTrack = normalizeLiveTrack(track);
     socket.emit('track:propose', { code, track: normalizedTrack || track, guestName: hostName, userName: hostName, hostId, userId });
-    showToast(`✅ "${track.title}" ajouté`);
+    const sw = document.querySelector('.search-wrap--host-hero');
+    if (sw) {
+      sw.classList.add('host-search--just-added');
+      setTimeout(() => sw.classList.remove('host-search--just-added'), 700);
+    }
+    showToast('Ajouté à la file');
     _liveSearchSeq++;
     hideSuggestions();
     document.getElementById('hostSearchInput').value = '';
