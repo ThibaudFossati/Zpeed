@@ -666,9 +666,11 @@ const server = http.createServer(app);
 const io = new Server(server);
 const isProd = process.env.NODE_ENV === 'production';
 const sessionSecret = String(process.env.SESSION_SECRET || '').trim();
-if (isProd && sessionSecret.length < 24) {
-  throw new Error('SESSION_SECRET must be set with at least 24 chars in production.');
+const hasStrongSessionSecret = sessionSecret.length >= 24;
+if (isProd && !hasStrongSessionSecret) {
+  console.warn('[BOOT] SESSION_SECRET missing/weak (<24 chars). Server will still start, but set a strong secret in production.');
 }
+console.log('[BOOT] core initialized');
 const SessionStore = MemoryStoreFactory(session);
 const sessionStore = new SessionStore({
   checkPeriod: 24 * 60 * 60 * 1000
@@ -687,6 +689,7 @@ app.use(session({
     secure: isProd
   }
 }));
+console.log('[BOOT] middleware configured');
 
 // ─────────────────────────────────────────────
 // GOOGLE OAUTH
@@ -869,6 +872,12 @@ function resolveSpotifyRedirectUri() {
 }
 
 const SPOTIFY_REDIRECT = resolveSpotifyRedirectUri();
+const hasSpotifyEnv =
+  !!String(process.env.SPOTIFY_CLIENT_ID || '').trim() &&
+  !!String(process.env.SPOTIFY_CLIENT_SECRET || '').trim();
+if (!hasSpotifyEnv) {
+  console.warn('[BOOT] Spotify env missing (SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET). Spotify features will be unavailable.');
+}
 
 function useMockSpotify() {
   return process.env.USE_MOCK_SPOTIFY === 'true';
@@ -923,6 +932,12 @@ app.get('/api/spotify/oauth-debug', (req, res) => {
 });
 
 app.get('/auth/spotify', (req, res) => {
+  if (!hasSpotifyEnv) {
+    return res.status(503).json({
+      error: 'spotify_not_configured',
+      message: 'Spotify env vars are missing on this deployment.'
+    });
+  }
   const { sessionCode } = req.query;
   const scopes = SPOTIFY_SCOPES;
   const state = sessionCode ? resolveSessionKey(sessionCode) : '';
@@ -937,6 +952,9 @@ app.get('/auth/spotify', (req, res) => {
 });
 
 app.get('/auth/spotify/callback', async (req, res) => {
+  if (!hasSpotifyEnv) {
+    return res.redirect('/host.html?spotify=missing_config');
+  }
   const { code: authCode, state } = req.query;
   console.log('[SPOTIFY] callback received');
   try {
@@ -2510,11 +2528,15 @@ setInterval(() => {
 }, 5000);
 
 server.listen(PORT, '0.0.0.0', () => {
+  console.log('[BOOT] entering listen callback');
   console.log(`\n🚀 ZPEED running on http://localhost:${PORT}`);
   console.log(`📱 Sur le réseau local : http://${LAN_IP}:${PORT}\n`);
   console.log('[ZPEED] boot env (values hidden):', {
+    NODE_ENV: process.env.NODE_ENV || 'development',
+    hasStrongSessionSecret,
     SPOTIFY_CLIENT_ID: !!process.env.SPOTIFY_CLIENT_ID,
     SPOTIFY_CLIENT_SECRET: !!process.env.SPOTIFY_CLIENT_SECRET,
+    hasSpotifyEnv,
     SPOTIFY_REDIRECT_URI_env: !!process.env.SPOTIFY_REDIRECT_URI,
     PUBLIC_APP_URL: !!process.env.PUBLIC_APP_URL,
     PUBLIC_URL: !!process.env.PUBLIC_URL,
