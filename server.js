@@ -7,6 +7,7 @@ const { v4: uuidv4 } = require('uuid');
 const YouTube = require('youtube-sr').default;
 const { google } = require('googleapis');
 const session = require('express-session');
+const MemoryStoreFactory = require('memorystore');
 const SpotifyWebApi = require('spotify-web-api-node');
 const axios = require('axios');
 const fs = require('fs');
@@ -663,14 +664,28 @@ const app = express();
 app.set('trust proxy', 1);
 const server = http.createServer(app);
 const io = new Server(server);
+const isProd = process.env.NODE_ENV === 'production';
+const sessionSecret = String(process.env.SESSION_SECRET || '').trim();
+if (isProd && sessionSecret.length < 24) {
+  throw new Error('SESSION_SECRET must be set with at least 24 chars in production.');
+}
+const SessionStore = MemoryStoreFactory(session);
+const sessionStore = new SessionStore({
+  checkPeriod: 24 * 60 * 60 * 1000
+});
 
 app.use(express.static('public'));
 app.use(express.json());
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'zpeed_secret',
+  secret: sessionSecret || 'zpeed_secret_dev_only',
+  store: sessionStore,
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 24 * 60 * 60 * 1000 }
+  cookie: {
+    maxAge: 24 * 60 * 60 * 1000,
+    sameSite: 'lax',
+    secure: isProd
+  }
 }));
 
 // ─────────────────────────────────────────────
@@ -2451,28 +2466,32 @@ app.get('/api/config', (req, res) => {
   });
 });
 
-// ── DEBUG: socket rooms ──
-app.get('/api/debug/rooms', async (req, res) => {
-  const sockets = await io.fetchSockets();
-  const rooms = {};
-  sockets.forEach(s => { rooms[s.id] = [...s.rooms]; });
-  res.json({ socketCount: sockets.length, rooms });
-});
+if (process.env.NODE_ENV !== 'production') {
+  // ── DEBUG: socket rooms ──
+  app.get('/api/debug/rooms', async (req, res) => {
+    const sockets = await io.fetchSockets();
+    const rooms = {};
+    sockets.forEach(s => {
+      rooms[s.id] = [...s.rooms];
+    });
+    res.json({ socketCount: sockets.length, rooms });
+  });
 
-// ── TEST ENDPOINT: injecte des tracks dans une session ──
-app.post('/api/test/inject', (req, res) => {
-  const { code } = req.body;
-  const s = sessions[code];
-  if (!s) return res.status(404).json({ error: 'Session not found' });
-  const tracks = [
-    { id: uuidv4(), videoId:'v1', title:'Blinding Lights', channel:'The Weeknd', thumbnail:'https://img.youtube.com/vi/4NRXx6U8ABQ/mqdefault.jpg', votes:6, proposedBy:'Marc', voters:['g1','g2','g3','g4','g5','g6'], voterNames:['Marc','Julie','Thomas','Sophie','Lucas','Karim'], platform:'youtube' },
-    { id: uuidv4(), videoId:'v2', title:'As It Was', channel:'Harry Styles', thumbnail:'https://img.youtube.com/vi/H5v3kku4y6Q/mqdefault.jpg', votes:3, proposedBy:'Julie', voters:['g1','g2','g3'], voterNames:['Marc','Thomas','Sophie'], platform:'youtube' },
-    { id: uuidv4(), videoId:'v3', title:'Levitating', channel:'Dua Lipa', thumbnail:'https://img.youtube.com/vi/TUVcZfQe-Kw/mqdefault.jpg', votes:1, proposedBy:'Thomas', voters:['g1'], voterNames:['Marc'], platform:'youtube' },
-  ];
-  s.queue = tracks;
-  io.to(`session:${code}`).emit('queue:update', { queue: s.queue });
-  res.json({ ok: true, injected: tracks.length });
-});
+  // ── TEST ENDPOINT: injecte des tracks dans une session ──
+  app.post('/api/test/inject', (req, res) => {
+    const { code } = req.body;
+    const s = sessions[code];
+    if (!s) return res.status(404).json({ error: 'Session not found' });
+    const tracks = [
+      { id: uuidv4(), videoId: 'v1', title: 'Blinding Lights', channel: 'The Weeknd', thumbnail: 'https://img.youtube.com/vi/4NRXx6U8ABQ/mqdefault.jpg', votes: 6, proposedBy: 'Marc', voters: ['g1', 'g2', 'g3', 'g4', 'g5', 'g6'], voterNames: ['Marc', 'Julie', 'Thomas', 'Sophie', 'Lucas', 'Karim'], platform: 'youtube' },
+      { id: uuidv4(), videoId: 'v2', title: 'As It Was', channel: 'Harry Styles', thumbnail: 'https://img.youtube.com/vi/H5v3kku4y6Q/mqdefault.jpg', votes: 3, proposedBy: 'Julie', voters: ['g1', 'g2', 'g3'], voterNames: ['Marc', 'Thomas', 'Sophie'], platform: 'youtube' },
+      { id: uuidv4(), videoId: 'v3', title: 'Levitating', channel: 'Dua Lipa', thumbnail: 'https://img.youtube.com/vi/TUVcZfQe-Kw/mqdefault.jpg', votes: 1, proposedBy: 'Thomas', voters: ['g1'], voterNames: ['Marc'], platform: 'youtube' }
+    ];
+    s.queue = tracks;
+    io.to(`session:${code}`).emit('queue:update', { queue: s.queue });
+    res.json({ ok: true, injected: tracks.length });
+  });
+}
 
 // ─────────────────────────────────────────────
 // Spotify pipeline tick (5s — aligné retry device / consommation progressive)

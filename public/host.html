@@ -692,21 +692,7 @@
     .heat-bar  { height: 3px; border-radius: 99px; background: rgba(255,255,255,0.06); margin-top: 5px; overflow: hidden; }
     .heat-fill { height: 100%; border-radius: 99px; transition: width 0.6s cubic-bezier(.34,1.56,.64,1), background 0.6s; }
 
-    /* ── VOTER AVATARS ── */
-    .voter-avatars { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 4px; }
-    .voter-av {
-      width: 26px; height: 26px; border-radius: 50%;
-      flex-shrink: 0; display: block;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.35), 0 0 0 1.5px rgba(255,255,255,0.12);
-      animation: popIn 0.35s cubic-bezier(.34,1.56,.64,1);
-    }
-    .voter-av-more {
-      width: 26px; height: 26px; border-radius: 50%;
-      flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-      font-size: 0.58rem; font-weight: 700; color: var(--text2);
-      background: rgba(0,212,200,0.15);
-      box-shadow: 0 0 0 1.5px rgba(0,212,200,0.25);
-    }
+    /* Voter avatars: see style.css .avatar-card--voter, .voter-avatars */
 
     /* ── EMOJI RAIN (host) ── */
     #emojiRainHost {
@@ -733,7 +719,6 @@
       white-space: nowrap;
     }
 
-    @keyframes popIn { 0%{transform:scale(0);opacity:0} 70%{transform:scale(1.2)} 100%{transform:scale(1);opacity:1} }
     @keyframes floatUpH { 0%{transform:translateY(0) scale(0.5);opacity:1} 60%{opacity:1} 100%{transform:translateY(-75vh) scale(1.3);opacity:0} }
     @keyframes slideInRight { 0%{transform:translateX(60px);opacity:0} 100%{transform:translateX(0);opacity:1} }
     @keyframes fadeOutPill  { 0%{opacity:1} 100%{opacity:0;transform:translateX(20px)} }
@@ -2297,7 +2282,6 @@
     clearTimeout(_suggestTimer);
     _suggestIndex = -1;
     const q = val.trim();
-    console.log('[HOST_SEARCH] input', { len: q.length, preview: q.slice(0, 24) });
     if (q.length < 2) {
       _liveSearchSeq++;
       hideSuggestions();
@@ -2478,7 +2462,6 @@
         : fetch(`/api/spotify/search?q=${encodeURIComponent(q)}&code=${encodeURIComponent(code)}`)
             .then(async r => {
               const body = await r.json().catch(() => ({}));
-              console.log('[HOST_SEARCH] fetch status', { spotifyHttp: r.status, ok: r.ok });
               if (!r.ok) return { __error: true, status: r.status, body };
               return body;
             })
@@ -2511,13 +2494,7 @@
       .map(normalizeLiveTrack)
       .filter(Boolean);
 
-    console.log('[HOST_SEARCH] raw shape', {
-      ytIsArray: Array.isArray(ytRaw),
-      spIsArray: Array.isArray(spRaw),
-      spError: !!(spValue && spValue.__error)
-    });
     const tracks = [...spTracks, ...ytTracks].slice(0, 15);
-    console.log('[HOST_SEARCH] normalized count', tracks.length);
     const value = { tracks, errorMsg };
     _searchCache.set(cacheKey, { value, expiresAt: now + _SEARCH_CACHE_TTL_MS });
     return value;
@@ -2527,34 +2504,20 @@
     const box = document.getElementById('hostSearchResults');
     const mySeq = ++_liveSearchSeq;
 
-    if (!box) {
-      console.warn('[HOST_SEARCH] missing #hostSearchResults');
-      return;
-    }
-
-    console.log('[HOST_SEARCH] fetch start', { q: q.slice(0, 48), fromButton, seq: mySeq });
-    console.log('[HOST_SEARCH] render target found', { id: 'hostSearchResults', inDom: !!box });
+    if (!box) return;
 
     try {
       box.classList.add('open');
       box.innerHTML = '<div class="sugg-status" role="status"><span class="sugg-spinner" aria-hidden="true"></span> Recherche…</div>';
-    } catch (e) {
-      console.warn('[HOST_SEARCH] could not show loading state', e);
-    }
+    } catch (_) {}
 
     try {
       const { tracks, errorMsg } = await fetchLiveSearchResults(q);
-      if (mySeq !== _liveSearchSeq) {
-        console.log('[HOST_SEARCH] stale response ignored', { seq: mySeq, live: _liveSearchSeq });
-        return;
-      }
-
-      console.log('[HOST_SEARCH] results count', tracks.length, errorMsg ? '(partial/error)' : '');
+      if (mySeq !== _liveSearchSeq) return;
 
       if (errorMsg && !tracks.length) {
         box.innerHTML = `<div class="sugg-empty" style="color:#f87171">${escapeHtml(errorMsg)}</div>`;
         box.classList.add('open');
-        console.log('[HOST_SEARCH] render done visible', { mode: 'error-empty', open: box.classList.contains('open') });
         return;
       }
       if (errorMsg) showToast(errorMsg);
@@ -2563,17 +2526,14 @@
       if (!_suggestData.length) {
         box.innerHTML = '<div class="sugg-empty">Aucun résultat</div>';
         box.classList.add('open');
-        console.log('[HOST_SEARCH] render done visible', { mode: 'no-results', open: true });
         return;
       }
       renderSuggestions(_suggestData);
-      console.log('[HOST_SEARCH] render done visible', { mode: 'list', n: _suggestData.length, open: box.classList.contains('open') });
     } catch (err) {
       if (mySeq !== _liveSearchSeq) return;
       const msg = err && err.message ? String(err.message) : 'Spotify indisponible — réessaie.';
       box.innerHTML = `<div class="sugg-empty" style="color:#f87171">${escapeHtml(msg)}</div>`;
       box.classList.add('open');
-      console.log('[HOST_SEARCH] render done visible', { mode: 'exception', err: msg });
     }
   }
 
@@ -2780,7 +2740,9 @@
     const contribHtml =
       contrib.name && contrib.count > 0
         ? `<button type="button" class="src-contrib-hit" onclick="hostSourcesContributorTap('${encodeURIComponent(contrib.userId || '')}')">
-            <img class="src-contrib-av" src="${avatarUrl(contrib.name, 96)}" alt="">
+            <div class="avatar-card avatar-card--contrib" aria-hidden="true">
+              <img class="avatar-card__img" src="${avatarUrl(contrib.name, 96)}" alt="" loading="lazy" decoding="async" onerror="this.onerror=null;this.src=avatarUrlInitialsCanvas(decodeURIComponent('${encodeURIComponent(String(contrib.name))}'),96)">
+            </div>
             <div class="src-contrib-meta">
               <div class="src-contrib-name">${escapeHtml(contrib.name)}</div>
               <div class="src-contrib-sub">${contrib.count} proposition${contrib.count > 1 ? 's' : ''}</div>
@@ -3050,14 +3012,12 @@
 
   async function playSpotifyTrack(uri) {
     if (window._spotifyMockMode) {
-      console.log('[spotify] playback skipped (mock mode)');
       return;
     }
     const spStatus = document.getElementById('spotify-player-status');
     if (spStatus) spStatus.style.display = 'block';
     document.getElementById('yt-player').style.display = 'none';
     if (!window._spotifyToken || window._spotifyRateLimited) {
-      console.log('[spotify] playback blocked:', { hasToken: !!window._spotifyToken, rateLimited: window._spotifyRateLimited });
       if (window._spotifyRateLimited) showToast('Spotify limite les requêtes — réessaie plus tard.');
       return;
     }
@@ -3459,7 +3419,7 @@
       const safeTr = JSON.stringify(t).replace(/"/g, '&quot;');
       const voterList = t.voterNames || [];
       const voters = voterList.slice(0, 4).map(n =>
-        `<img class="voter-av" src="${avatarUrl(n, 52)}" alt="${n}" title="${n}">`
+        `<div class="avatar-card avatar-card--voter" title="${n}"><img class="avatar-card__img" src="${avatarUrl(n, 52)}" alt="${n}" loading="lazy" decoding="async" onerror="this.onerror=null;this.src=avatarUrlInitialsCanvas(decodeURIComponent('${encodeURIComponent(String(n))}'),52)"></div>`
       ).join('') + (voterList.length > 4 ? `<div class="voter-av-more">+${voterList.length - 4}</div>` : '');
       const stKey = t.status || 'pending';
       const stClass = 'status-' + stKey;
@@ -3570,7 +3530,11 @@
         document.getElementById('sonderProfileStats').textContent = formatSonderPositiveStats(data.stats);
         const av = document.getElementById('sonderProfileAvatar');
         const nm = data.displayName || '?';
-        if (av) av.innerHTML = `<img src="${avatarUrl(nm, 96)}" alt="" width="96" height="96" style="border-radius:50%;display:block;object-fit:cover">`;
+        if (av) {
+          const _avSrc = avatarUrl(nm, 96);
+          const _avEsc = encodeURIComponent(String(nm));
+          av.innerHTML = `<div class="avatar-card avatar-card--sheet"><img class="avatar-card__img" src="${_avSrc}" alt="" width="96" height="96" loading="eager" decoding="async" onerror="this.onerror=null;this.src=avatarUrlInitialsCanvas(decodeURIComponent('${_avEsc}'),96)"></div>`;
+        }
       })
       .catch(() => {
         closeSonderProfile();
@@ -3751,9 +3715,11 @@
         const vibeLine = hostGuestSocialLabel(g.name);
         return `
       <div class="${itemCls}"${uidAttr}>
-        <div class="guest-avatar guest-card__av">
-          <img src="${avatarUrl(g.name, 80)}" alt="${g.name}"
-               onerror="this.onerror=null;this.style.display='none';this.parentElement.textContent='${g.name.charAt(0).toUpperCase()}';this.parentElement.style.background='${stringToColor(g.name)}'">
+        <div class="guest-card__av">
+          <div class="avatar-card avatar-card--guest" aria-hidden="true">
+            <img class="avatar-card__img" src="${avatarUrl(g.name, 80)}" alt="${g.name}" loading="lazy" decoding="async"
+                 onerror="this.onerror=null;this.removeAttribute('loading');this.src=avatarUrlInitialsCanvas(decodeURIComponent('${encodeURIComponent(String(g.name))}'),80)">
+          </div>
         </div>
         <div class="guest-card__body">
           <div class="guest-card__name">${g.name}</div>
@@ -3773,17 +3739,18 @@
     return `hsl(${h % 360},55%,35%)`;
   }
 
-  // ── Apple-style avatar via DiceBear lorelei ──────────────────
-  // Apple Contacts–style avatar: gradient + initials, canvas-generated data URL
-  function avatarUrl(name, size) {
+  // ── Avatars “personnage” (style illustré, stable par prénom) — DiceBear avataaars
+  // Si le chargement échoue, les onerror des <img> retombent sur initiales (canvas)
+  function avatarUrlInitialsCanvas(name, size) {
     const GRADS = [
       ['#FF6B6B','#EE0979'],['#FF9A44','#FC6076'],['#43E97B','#38F9D7'],
       ['#4FACFE','#00F2FE'],['#A18CD1','#FBC2EB'],['#F093FB','#F5576C'],
       ['#4481EB','#04BEFE'],['#FA709A','#FEE140'],['#0BA360','#3CBA92'],
       ['#FF5F6D','#FFC371'],['#30CFD0','#330867'],['#667EEA','#764BA2']
     ];
+    const nm = String(name || '');
     let h = 0;
-    for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h<<5) - h);
+    for (let i = 0; i < nm.length; i++) h = nm.charCodeAt(i) + ((h << 5) - h);
     const [c1, c2] = GRADS[Math.abs(h) % GRADS.length];
     const s = size || 80;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -3792,28 +3759,37 @@
     const ctx = cv.getContext('2d');
     ctx.scale(dpr, dpr);
     ctx.beginPath();
-    ctx.arc(s/2, s/2, s/2, 0, Math.PI*2);
+    ctx.arc(s / 2, s / 2, s / 2, 0, Math.PI * 2);
     ctx.clip();
     const grd = ctx.createLinearGradient(0, 0, s, s);
     grd.addColorStop(0, c1);
     grd.addColorStop(1, c2);
     ctx.fillStyle = grd;
     ctx.fillRect(0, 0, s, s);
-    const hl = ctx.createRadialGradient(s*0.35, s*0.28, 0, s/2, s/2, s/2);
+    const hl = ctx.createRadialGradient(s * 0.35, s * 0.28, 0, s / 2, s / 2, s / 2);
     hl.addColorStop(0, 'rgba(255,255,255,0.28)');
     hl.addColorStop(1, 'rgba(0,0,0,0.10)');
     ctx.fillStyle = hl;
     ctx.fillRect(0, 0, s, s);
-    const initials = name.trim().split(/\s+/).slice(0,2).map(w => w[0].toUpperCase()).join('');
+    const initials = nm.trim().split(/\s+/).slice(0, 2).map(w => w[0] && w[0].toUpperCase()).filter(Boolean).join('') || '?';
     ctx.shadowColor = 'rgba(0,0,0,0.22)';
     ctx.shadowBlur = s * 0.06;
     ctx.fillStyle = 'rgba(255,255,255,0.96)';
-    ctx.font = `600 ${Math.round(s*0.38)}px -apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif`;
+    ctx.font = `600 ${Math.round(s * 0.38)}px -apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(initials, s/2, s/2 + s*0.025);
+    ctx.fillText(initials, s / 2, s / 2 + s * 0.025);
     return cv.toDataURL('image/png');
   }
+
+  function avatarUrl(name) {
+    const seed = String(name == null || String(name).trim() === '' ? 'sonder' : String(name).trim());
+    // SVG = net net, propre sur Retina (personnage type Memoji)
+    return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}&backgroundType=transparent`;
+  }
+
+  window.avatarUrl = avatarUrl;
+  window.avatarUrlInitialsCanvas = avatarUrlInitialsCanvas;
 
   // ─────────────────────────────────────────────
   // ACTIONS
@@ -4233,7 +4209,10 @@
     const nmEl = document.getElementById('sonderHostChipName');
     if (nmEl) nmEl.textContent = hn;
     const avEl = document.getElementById('sonderHostChipAv');
-    if (avEl) avEl.innerHTML = `<img src="${avatarUrl(hn, 40)}" alt="" width="32" height="32" style="border-radius:50%;display:block;object-fit:cover">`;
+    if (avEl) {
+      const _h = encodeURIComponent(String(hn));
+      avEl.innerHTML = `<span class="avatar-card avatar-card--chip"><img class="avatar-card__img" src="${avatarUrl(hn, 40)}" alt="" width="32" height="32" loading="lazy" decoding="async" onerror="this.onerror=null;this.src=avatarUrlInitialsCanvas(decodeURIComponent('${_h}'),40)"></span>`;
+    }
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') closeSonderProfile();
     });

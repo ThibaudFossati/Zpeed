@@ -23,24 +23,7 @@
       transition: width 0.6s cubic-bezier(.34,1.56,.64,1), background 0.6s ease;
     }
 
-    /* ── VOTER AVATARS ── */
-    .voter-avatars {
-      display: flex; gap: 4px; flex-wrap: wrap;
-      margin-top: 6px; align-items: center;
-    }
-    .voter-av {
-      width: 26px; height: 26px; border-radius: 50%;
-      flex-shrink: 0; display: block;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.35), 0 0 0 1.5px rgba(255,255,255,0.12);
-      animation: popIn 0.35s cubic-bezier(.34,1.56,.64,1);
-    }
-    .voter-av-more {
-      width: 26px; height: 26px; border-radius: 50%;
-      flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-      font-size: 0.58rem; font-weight: 700; color: var(--text2);
-      background: rgba(0,212,200,0.15);
-      box-shadow: 0 0 0 1.5px rgba(0,212,200,0.25);
-    }
+    /* Voter avatars: style.css .avatar-card, .voter-avatars */
 
     /* ── REACTIONS ── */
     .reaction-strip {
@@ -311,11 +294,11 @@
   <div class="tab-panel" id="panel-profil">
     <!-- Guest card -->
     <div class="glass guest-identity-tap" id="guestIdentityTap" role="button" tabindex="0" style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
-      <div id="profilAvatar" style="
-        width:72px;height:72px;flex-shrink:0;
-        box-shadow:0 4px 18px rgba(0,0,0,0.40);
-        border-radius:50%;
-      "><img id="profilAvatarImg" src="" alt="" style="width:100%;height:100%;display:block;border-radius:50%;"></div>
+      <div id="profilAvatar" class="guest-profil-avatar-wrap" aria-hidden="true">
+        <div class="avatar-card avatar-card--profile-guest">
+          <img id="profilAvatarImg" src="" alt="" width="64" height="64" class="avatar-card__img" loading="eager" decoding="async">
+        </div>
+      </div>
       <div style="flex:1;position:relative;z-index:1">
         <div style="font-size:1.1rem;font-weight:700" id="profilName"></div>
         <div style="font-size:0.8rem;color:var(--text2)">Guest · Session <span id="profilCode" style="color:var(--purple-light)"></span></div>
@@ -417,6 +400,70 @@
     return uid;
   }
 
+  function avatarUrlInitialsCanvas(name, size) {
+    const GRADS = [
+      ['#FF6B6B', '#EE0979'],
+      ['#FF9A44', '#FC6076'],
+      ['#43E97B', '#38F9D7'],
+      ['#4FACFE', '#00F2FE'],
+      ['#A18CD1', '#FBC2EB'],
+      ['#F093FB', '#F5576C'],
+      ['#4481EB', '#04BEFE'],
+      ['#FA709A', '#FEE140'],
+      ['#0BA360', '#3CBA92'],
+      ['#FF5F6D', '#FFC371'],
+      ['#30CFD0', '#330867'],
+      ['#667EEA', '#764BA2']
+    ];
+    const nm = String(name || '');
+    let h = 0;
+    for (let i = 0; i < nm.length; i++) h = nm.charCodeAt(i) + ((h << 5) - h);
+    const [c1, c2] = GRADS[Math.abs(h) % GRADS.length];
+    const s = size || 80;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = s * dpr;
+    const ctx = cv.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.beginPath();
+    ctx.arc(s / 2, s / 2, s / 2, 0, Math.PI * 2);
+    ctx.clip();
+    const grd = ctx.createLinearGradient(0, 0, s, s);
+    grd.addColorStop(0, c1);
+    grd.addColorStop(1, c2);
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, s, s);
+    const hl = ctx.createRadialGradient(s * 0.35, s * 0.28, 0, s / 2, s / 2, s / 2);
+    hl.addColorStop(0, 'rgba(255,255,255,0.28)');
+    hl.addColorStop(1, 'rgba(0,0,0,0.10)');
+    ctx.fillStyle = hl;
+    ctx.fillRect(0, 0, s, s);
+    const initials =
+      nm
+        .trim()
+        .split(/\s+/)
+        .slice(0, 2)
+        .map(w => w[0] && w[0].toUpperCase())
+        .filter(Boolean)
+        .join('') || '?';
+    ctx.shadowColor = 'rgba(0,0,0,0.22)';
+    ctx.shadowBlur = s * 0.06;
+    ctx.fillStyle = 'rgba(255,255,255,0.96)';
+    ctx.font = `600 ${Math.round(s * 0.38)}px -apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(initials, s / 2, s / 2 + s * 0.025);
+    return cv.toDataURL('image/png');
+  }
+
+  function avatarUrl(name) {
+    const seed = String(name == null || String(name).trim() === '' ? 'sonder' : String(name).trim());
+    return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}&backgroundType=transparent`;
+  }
+
+  window.avatarUrl = avatarUrl;
+  window.avatarUrlInitialsCanvas = avatarUrlInitialsCanvas;
+
   const urlCode    = new URLSearchParams(window.location.search).get('code');
   const storedCode = localStorage.getItem('zpeed_code');
   const code       = urlCode || storedCode;
@@ -433,8 +480,16 @@
   document.getElementById('codeDisplay').textContent   = code;
   document.getElementById('profilName').textContent    = guestName;
   document.getElementById('profilCode').textContent    = code;
-  // Apple-style avatar (canvas, no external dependency)
-  document.getElementById('profilAvatarImg').src = avatarUrl(guestName, 128);
+  (function initProfilAvatarImg() {
+    const avi = document.getElementById('profilAvatarImg');
+    if (avi) {
+      avi.src = avatarUrl(guestName);
+      avi.onerror = function () {
+        this.onerror = null;
+        this.src = avatarUrlInitialsCanvas(guestName, 128);
+      };
+    }
+  })();
   document.getElementById('statCode').textContent      = code;
   document.getElementById('statHost').textContent      = hostName;
 
@@ -1061,9 +1116,12 @@
       if (avContainer) {
         const bg  = stringToColor(voterName);
         const av  = document.createElement('div');
-        av.className   = 'voter-av';
-        av.style.background = bg;
-        av.textContent = initials;
+        av.className = 'avatar-card avatar-card--voter-initial';
+        const face = document.createElement('div');
+        face.className = 'avatar-card__initial';
+        face.style.background = bg;
+        face.textContent = initials;
+        av.appendChild(face);
         avContainer.appendChild(av);
       }
     }
@@ -1300,52 +1358,6 @@
     return `hsl(${h % 360},55%,35%)`;
   }
 
-  // ── Apple-style avatar via DiceBear lorelei ──────────────────
-  // Apple Contacts–style avatar: gradient + initials, canvas-generated data URL
-  function avatarUrl(name, size) {
-    const GRADS = [
-      ['#FF6B6B','#EE0979'],['#FF9A44','#FC6076'],['#43E97B','#38F9D7'],
-      ['#4FACFE','#00F2FE'],['#A18CD1','#FBC2EB'],['#F093FB','#F5576C'],
-      ['#4481EB','#04BEFE'],['#FA709A','#FEE140'],['#0BA360','#3CBA92'],
-      ['#FF5F6D','#FFC371'],['#30CFD0','#330867'],['#667EEA','#764BA2']
-    ];
-    let h = 0;
-    for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h<<5) - h);
-    const [c1, c2] = GRADS[Math.abs(h) % GRADS.length];
-    const s = size || 80;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const cv = document.createElement('canvas');
-    cv.width = cv.height = s * dpr;
-    const ctx = cv.getContext('2d');
-    ctx.scale(dpr, dpr);
-    // Circular clip for transparent corners
-    ctx.beginPath();
-    ctx.arc(s/2, s/2, s/2, 0, Math.PI*2);
-    ctx.clip();
-    // Gradient background (Apple palette)
-    const grd = ctx.createLinearGradient(0, 0, s, s);
-    grd.addColorStop(0, c1);
-    grd.addColorStop(1, c2);
-    ctx.fillStyle = grd;
-    ctx.fillRect(0, 0, s, s);
-    // Inner highlight (iOS depth effect)
-    const hl = ctx.createRadialGradient(s*0.35, s*0.28, 0, s/2, s/2, s/2);
-    hl.addColorStop(0, 'rgba(255,255,255,0.28)');
-    hl.addColorStop(1, 'rgba(0,0,0,0.10)');
-    ctx.fillStyle = hl;
-    ctx.fillRect(0, 0, s, s);
-    // Initials
-    const initials = name.trim().split(/\s+/).slice(0,2).map(w => w[0].toUpperCase()).join('');
-    ctx.shadowColor = 'rgba(0,0,0,0.22)';
-    ctx.shadowBlur = s * 0.06;
-    ctx.fillStyle = 'rgba(255,255,255,0.96)';
-    ctx.font = `600 ${Math.round(s*0.38)}px -apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(initials, s/2, s/2 + s*0.025);
-    return cv.toDataURL('image/png');
-  }
-
   function formatSonderPositiveStatsGuest(st) {
     if (!st || typeof st !== 'object') return 'Ta présence nourrit la soirée ✨';
     const parts = [];
@@ -1407,7 +1419,10 @@
         document.getElementById('sonderProfileStats').textContent = formatSonderPositiveStatsGuest(data.stats);
         const av = document.getElementById('sonderProfileAvatar');
         const nm = data.displayName || '?';
-        if (av) av.innerHTML = `<img src="${avatarUrl(nm, 96)}" alt="" width="96" height="96" style="border-radius:50%;display:block;object-fit:cover">`;
+        if (av) {
+          const _e = encodeURIComponent(String(nm));
+          av.innerHTML = `<div class="avatar-card avatar-card--sheet"><img class="avatar-card__img" src="${avatarUrl(nm, 96)}" alt="" width="96" height="96" loading="eager" decoding="async" onerror="this.onerror=null;this.src=avatarUrlInitialsCanvas(decodeURIComponent('${_e}'),96)"></div>`;
+        }
       })
       .catch(() => {
         closeSonderProfile();
